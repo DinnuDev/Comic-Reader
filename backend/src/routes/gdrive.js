@@ -1,113 +1,225 @@
+'use strict';
 const express = require('express');
 const router = express.Router();
+const svc = require('../services/gdriveService');
 const db = require('../db/database');
 const { v4: uuidv4 } = require('uuid');
-const gdriveService = require('../services/gdriveService');
 
 const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-// GET /api/gdrive/config-status - is the server configured with credentials?
+// ── Config & status ───────────────────────────────────────────────────────
+
+// GET /api/gdrive/config-status
 router.get('/config-status', (req, res) => {
-  res.json({ configured: gdriveService.isConfigured() });
+  res.json({ configured: svc.isConfigured() });
 });
 
-// GET /api/gdrive/auth - get OAuth2 URL
+// GET /api/gdrive/accounts — list all connected accounts (persisted in DB)
+router.get('/accounts', (req, res) => {
+  res.json(svc.listAccounts());
+});
+
+// GET /api/gdrive/status — legacy: first account + session fallback
+router.get('/status', (req, res) => {
+  const configured = svc.isConfigured();
+  const accounts = svc.listAccounts();
+  const connected = accounts.length > 0;
+  res.json({
+    configured,
+    connected,
+    accounts,
+    // Legacy single-account fields
+    user: accounts[0] ? { email: accounts[0].email, name: accounts[0].name, picture: accounts[0].picture } : null,
+  });
+});
+
+// ── OAuth flow ────────────────────────────────────────────────────────────
+
+// GET /api/gdrive/auth — returns auth URL to open in popup or redirect
 router.get('/auth', (req, res) => {
   try {
-    const url = gdriveService.getAuthUrl();
+    const url = svc.getAuthUrl();
     res.json({ url });
   } catch (err) {
     res.status(503).json({ error: err.message });
   }
 });
 
-// GET /api/gdrive/callback - OAuth2 callback
+// GET /api/gdrive/callback — OAuth2 callback from Google
 router.get('/callback', async (req, res) => {
   const { code, error } = req.query;
 
   if (error) {
-    return res.redirect(`${FRONTEND}?gdrive=error&reason=${encodeURIComponent(error)}`);
+    return sendPopupResult(res, FRONTEND, 'error', error);
   }
   if (!code) {
-    return res.redirect(`${FRONTEND}?gdrive=error&reason=no_code`);
+    return sendPopupResult(res, FRONTEND, 'error', 'no_code');
   }
 
   try {
-    const tokens = await gdriveService.exchangeCode(code);
-    req.session.gdriveTokens = tokens;
+    const tokens = await svc.exchangeCode(code);
+    const account = await svc.saveAccount(tokens);
 
-    // Fetch user info and attach to session
-    try {
-      const userInfo = await gdriveService.getUserInfo(tokens);
-      req.session.gdriveUser = { email: userInfo.email, picture: userInfo.picture };
-    } catch (_) { /* user info is optional */ }
+    // Also keep in session for legacy page-reading endpoints
+    req.session.gdriveTokens = {
+      access_token:  account.access_token,
+      refresh_token: account.refresh_token,
+      expiry_date:   account.expiry_date,
+    };
+    req.session.gdriveUser = { email: account.email, name: account.name, picture: account.picture };
+    req.session.gdriveAccountId = account.id;
 
     req.session.save(() => {
-      res.redirect(`${FRONTEND}?gdrive=connected`);
+      sendPopupResult(res, FRONTEND, 'connected', account.id);
     });
   } catch (err) {
-    console.error('[gdrive] Token exchange error:', err.message);
+    console.error('[gdrive] callback error:', err.message);
     const reason = err.message.includes('invalid_grant') ? 'invalid_grant' : encodeURIComponent(err.message);
-    res.redirect(`${FRONTEND}?gdrive=error&reason=${reason}`);
+    sendPopupResult(res, FRONTEND, 'error', reason);
   }
 });
 
-// GET /api/gdrive/status
-router.get('/status', (req, res) => {
-  const connected = !!(req.session?.gdriveTokens?.access_token);
-  res.json({
-    connected,
-    configured: gdriveService.isConfigured(),
-    user: req.session?.gdriveUser || null,
-  });
+/**
+ * Sends an HTML page that:
+ *  1. If the window is a popup → sends postMessage to opener and closes
+ *  2. Otherwise → redirects the main window to the frontend
+ */
+function sendPopupResult(res, frontendUrl, status, payload) {
+  const encodedPayload = encodeURIComponent(payload || '');
+  res.send(`<!DOCTYPE html>
+<html>
+<head><title>Google Drive Auth</title></head>
+<body>
+<script>
+  var status = ${JSON.stringify(status)};
+  var payload = ${JSON.stringify(payload || '')};
+  if (window.opener) {
+    window.opener.postMessage({ type: 'gdrive-' + status, payload: payload }, '*');
+    window.close();
+  } else {
+    // Not a popup: redirect main window
+    var url = ${JSON.stringify(frontendUrl)} + '?gdrive=' + status;
+    if (status === 'error') url += '&reason=' + encodeURIComponent(payload);
+    window.location.href = url;
+  }
+</script>
+<p>Completing authentication…</p>
+</body>
+</html>`);
+}
+
+// POST /api/gdrive/disconnect/:accountId
+router.post('/disconnect/:accountId', (req, res) => {
+  svc.removeAccount(req.params.accountId);
+  // Clear session too
+  if (req.session.gdriveAccountId === req.params.accountId) {
+    delete req.session.gdriveTokens;
+    delete req.session.gdriveUser;
+    delete req.session.gdriveAccountId;
+  }
+  res.json({ success: true });
 });
 
-// POST /api/gdrive/disconnect
+// POST /api/gdrive/disconnect (disconnect all / legacy)
 router.post('/disconnect', (req, res) => {
   delete req.session.gdriveTokens;
   delete req.session.gdriveUser;
+  delete req.session.gdriveAccountId;
   res.json({ success: true });
 });
 
-// GET /api/gdrive/folders - list folders
-router.get('/folders', async (req, res) => {
-  if (!req.session?.gdriveTokens) return res.status(401).json({ error: 'Not authenticated with Google Drive' });
-  const { parent = 'root' } = req.query;
+// ── Helper: resolve account from request ─────────────────────────────────
+
+function resolveAccount(req) {
+  const accountId = req.query.accountId || req.session?.gdriveAccountId;
+  if (accountId) {
+    const account = svc.loadAccount(accountId);
+    if (account) return account;
+  }
+  // Fallback: first account in DB
+  const all = svc.listAccounts();
+  if (all.length > 0) return svc.loadAccount(all[0].id);
+  return null;
+}
+
+function requireAccount(req, res) {
+  const account = resolveAccount(req);
+  if (!account) {
+    res.status(401).json({ error: 'No Google Drive account connected. Please authenticate first.' });
+    return null;
+  }
+  return account;
+}
+
+// ── Account info & quota ──────────────────────────────────────────────────
+
+// GET /api/gdrive/about?accountId=...
+router.get('/about', async (req, res) => {
+  const account = requireAccount(req, res);
+  if (!account) return;
   try {
-    const folders = await gdriveService.listFolders(req.session.gdriveTokens, parent);
-    res.json(folders);
+    const about = await svc.getAbout(account);
+    res.json({ ...about, account: { id: account.id, email: account.email, picture: account.picture } });
   } catch (err) {
-    if (err.code === 401 || err.status === 401) {
-      delete req.session.gdriveTokens;
-      return res.status(401).json({ error: 'Google Drive session expired. Please reconnect.' });
-    }
-    res.status(500).json({ error: err.message });
+    handleDriveError(err, req, res);
   }
 });
 
-// GET /api/gdrive/files - list comic files in a folder
-router.get('/files', async (req, res) => {
-  if (!req.session?.gdriveTokens) return res.status(401).json({ error: 'Not authenticated with Google Drive' });
+// ── Folder browsing ───────────────────────────────────────────────────────
+
+// GET /api/gdrive/browse?folderId=root&accountId=...
+// Returns both subfolders and comic files in a folder
+router.get('/browse', async (req, res) => {
+  const account = requireAccount(req, res);
+  if (!account) return;
   const { folderId = 'root' } = req.query;
   try {
-    const files = await gdriveService.listComicFiles(req.session.gdriveTokens, folderId);
-    res.json(files);
+    const [contents, folderInfo] = await Promise.all([
+      svc.listFolderContents(account, folderId),
+      folderId !== 'root' ? svc.getFolderInfo(account, folderId).catch(() => null) : null,
+    ]);
+    res.json({ ...contents, folderInfo, folderId });
   } catch (err) {
-    if (err.code === 401 || err.status === 401) {
-      delete req.session.gdriveTokens;
-      return res.status(401).json({ error: 'Google Drive session expired. Please reconnect.' });
-    }
-    res.status(500).json({ error: err.message });
+    handleDriveError(err, req, res);
   }
 });
 
-// GET /api/gdrive/page - stream a page from Google Drive comic
+// GET /api/gdrive/folders?parent=root&accountId=...
+router.get('/folders', async (req, res) => {
+  const account = requireAccount(req, res);
+  if (!account) return;
+  const { parent = 'root' } = req.query;
+  try {
+    const folders = await svc.listFolders(account, parent);
+    res.json(folders);
+  } catch (err) {
+    handleDriveError(err, req, res);
+  }
+});
+
+// GET /api/gdrive/files?folderId=root&accountId=...
+router.get('/files', async (req, res) => {
+  const account = requireAccount(req, res);
+  if (!account) return;
+  const { folderId = 'root' } = req.query;
+  try {
+    const files = await svc.listComicFiles(account, folderId);
+    res.json(files);
+  } catch (err) {
+    handleDriveError(err, req, res);
+  }
+});
+
+// ── Page streaming ────────────────────────────────────────────────────────
+
+// GET /api/gdrive/page?fileId=...&page=0&accountId=...
 router.get('/page', async (req, res) => {
-  if (!req.session?.gdriveTokens) return res.status(401).json({ error: 'Not authenticated' });
+  const account = requireAccount(req, res);
+  if (!account) return;
   const { fileId, page } = req.query;
   if (!fileId || page === undefined) return res.status(400).json({ error: 'fileId and page required' });
   try {
-    const { buffer, mimeType } = await gdriveService.getPage(req.session.gdriveTokens, fileId, parseInt(page));
+    const { buffer, mimeType } = await svc.getPage(account, fileId, parseInt(page));
     res.set('Content-Type', mimeType);
     res.set('Cache-Control', 'public, max-age=3600');
     res.send(buffer);
@@ -116,82 +228,15 @@ router.get('/page', async (req, res) => {
   }
 });
 
-module.exports = router;
+// ── Error helper ──────────────────────────────────────────────────────────
 
-
-// GET /api/gdrive/auth - get OAuth2 URL
-router.get('/auth', (req, res) => {
-  const url = gdriveService.getAuthUrl();
-  res.json({ url });
-});
-
-// GET /api/gdrive/callback - OAuth2 callback
-router.get('/callback', async (req, res) => {
-  const { code } = req.query;
-  if (!code) return res.status(400).json({ error: 'Missing code' });
-
-  try {
-    const tokens = await gdriveService.exchangeCode(code);
-    req.session.gdriveTokens = tokens;
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}?gdrive=connected`);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+function handleDriveError(err, req, res) {
+  const status = err.code || err.status;
+  if (status === 401 || status === 403) {
+    return res.status(401).json({ error: 'Google Drive session expired. Please reconnect.', expired: true });
   }
-});
-
-// GET /api/gdrive/status
-router.get('/status', (req, res) => {
-  const connected = !!(req.session.gdriveTokens);
-  res.json({ connected });
-});
-
-// GET /api/gdrive/disconnect
-router.post('/disconnect', (req, res) => {
-  delete req.session.gdriveTokens;
-  res.json({ success: true });
-});
-
-// GET /api/gdrive/folders - list folders
-router.get('/folders', async (req, res) => {
-  if (!req.session.gdriveTokens) return res.status(401).json({ error: 'Not authenticated with Google Drive' });
-
-  const { parent = 'root' } = req.query;
-  try {
-    const folders = await gdriveService.listFolders(req.session.gdriveTokens, parent);
-    res.json(folders);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/gdrive/files - list comic files in a folder
-router.get('/files', async (req, res) => {
-  if (!req.session.gdriveTokens) return res.status(401).json({ error: 'Not authenticated with Google Drive' });
-
-  const { folderId = 'root' } = req.query;
-  try {
-    const files = await gdriveService.listComicFiles(req.session.gdriveTokens, folderId);
-    res.json(files);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/gdrive/page - stream a page from Google Drive comic
-router.get('/page', async (req, res) => {
-  if (!req.session.gdriveTokens) return res.status(401).json({ error: 'Not authenticated' });
-
-  const { fileId, page } = req.query;
-  if (!fileId || page === undefined) return res.status(400).json({ error: 'fileId and page required' });
-
-  try {
-    const { buffer, mimeType } = await gdriveService.getPage(req.session.gdriveTokens, fileId, parseInt(page));
-    res.set('Content-Type', mimeType);
-    res.set('Cache-Control', 'public, max-age=3600');
-    res.send(buffer);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+  console.error('[gdrive]', err.message);
+  res.status(500).json({ error: err.message });
+}
 
 module.exports = router;

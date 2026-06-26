@@ -58,11 +58,16 @@ export const progressApi = {
 // Google Drive
 export const gdriveApi = {
   getConfigStatus: () => api.get('/gdrive/config-status').then(r => r.data),
-  getStatus: () => api.get('/gdrive/status').then(r => r.data),
-  getAuthUrl: () => api.get('/gdrive/auth').then(r => r.data),
-  disconnect: () => api.post('/gdrive/disconnect').then(r => r.data),
-  listFolders: (parent) => api.get('/gdrive/folders', { params: { parent } }).then(r => r.data),
-  listFiles: (folderId) => api.get('/gdrive/files', { params: { folderId } }).then(r => r.data),
+  getStatus:       () => api.get('/gdrive/status').then(r => r.data),
+  getAccounts:     () => api.get('/gdrive/accounts').then(r => r.data),
+  getAuthUrl:      () => api.get('/gdrive/auth').then(r => r.data),
+  getAbout:        (accountId) => api.get('/gdrive/about', { params: { accountId } }).then(r => r.data),
+  disconnect:      (accountId) => api.post(accountId ? `/gdrive/disconnect/${accountId}` : '/gdrive/disconnect').then(r => r.data),
+
+  // Browse folders and comics
+  browse:       (folderId, accountId) => api.get('/gdrive/browse', { params: { folderId, accountId } }).then(r => r.data),
+  listFolders:  (parent, accountId)   => api.get('/gdrive/folders', { params: { parent, accountId } }).then(r => r.data),
+  listFiles:    (folderId, accountId) => api.get('/gdrive/files',   { params: { folderId, accountId } }).then(r => r.data),
 };
 
 // Upload — uses no-timeout client, supports AbortController signal

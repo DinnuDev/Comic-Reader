@@ -59,6 +59,18 @@ function migrate() {
     CREATE INDEX IF NOT EXISTS idx_comics_last_read ON comics(last_read);
     CREATE INDEX IF NOT EXISTS idx_progress_comic ON reading_progress(comic_id);
     CREATE INDEX IF NOT EXISTS idx_bookmarks_comic ON bookmarks(comic_id);
+
+    CREATE TABLE IF NOT EXISTS gdrive_accounts (
+      id          TEXT PRIMARY KEY,
+      email       TEXT NOT NULL UNIQUE,
+      name        TEXT,
+      picture     TEXT,
+      access_token  TEXT NOT NULL,
+      refresh_token TEXT,
+      expiry_date   INTEGER,
+      created_at  INTEGER DEFAULT (unixepoch()),
+      updated_at  INTEGER DEFAULT (unixepoch())
+    );
   `);
 
   console.log('Database migrated successfully');
