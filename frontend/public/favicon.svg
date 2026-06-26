@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Dark background with rounded corners -->
+  <rect width="32" height="32" rx="6" fill="#0a0a0a"/>
+  <!-- Comic panel grid — mimics a comic page layout -->
+  <!-- Large left panel -->
+  <rect x="3" y="3" width="11.5" height="15" rx="1.5" fill="#e50914"/>
+  <!-- Top-right panel -->
+  <rect x="16.5" y="3" width="12.5" height="7" rx="1.5" fill="#e50914" opacity="0.8"/>
+  <!-- Middle-right panel -->
+  <rect x="16.5" y="11.5" width="12.5" height="6.5" rx="1.5" fill="#e50914" opacity="0.5"/>
+  <!-- Bottom-left panel -->
+  <rect x="3" y="20" width="7.5" height="9" rx="1.5" fill="#e50914" opacity="0.65"/>
+  <!-- Bottom-right panel -->
+  <rect x="12.5" y="20" width="16.5" height="9" rx="1.5" fill="#e50914" opacity="0.9"/>
+  <!-- Action lines (speed lines) inside left panel -->
+  <line x1="5" y1="6" x2="13" y2="6" stroke="rgba(255,255,255,0.25)" stroke-width="0.8" stroke-linecap="round"/>
+  <line x1="5" y1="8" x2="12" y2="8" stroke="rgba(255,255,255,0.15)" stroke-width="0.8" stroke-linecap="round"/>
+</svg>

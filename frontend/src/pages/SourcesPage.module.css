@@ -3,58 +3,226 @@
   background: #0a0a0a;
 }
 
-.header {
+/* ── Hero ───────────────────────────────────────── */
+.hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 32px 56px 16px;
+  padding: 40px 56px 0;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
-.title {
-  color: #e5e5e5 !important;
-  margin: 0 !important;
-  font-size: 26px !important;
-  font-weight: 700 !important;
-}
-
-.content {
-  padding: 0 56px 56px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 960px;
-}
-
-.card { background: #141414 !important; border: 1px solid rgba(255,255,255,0.06) !important; }
-
-.card :global(.ant-card-head) {
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+.heroTitle {
+  font-size: 32px;
+  font-weight: 800;
   color: #e5e5e5;
+  margin: 0 0 4px;
+  letter-spacing: -0.5px;
 }
 
-.empty {
+.heroSub {
+  font-size: 14px;
+  color: rgba(255,255,255,0.4);
+  margin: 0;
+}
+
+/* Stat pills */
+.statPills { display: flex; gap: 12px; }
+
+.pill {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 40px 0;
+  gap: 6px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 24px;
+  padding: 8px 16px;
+}
+
+.pillIcon { color: #e50914; font-size: 14px; }
+
+.pillVal {
+  font-size: 18px;
+  font-weight: 800;
+  color: #e5e5e5;
+  min-width: 20px;
   text-align: center;
 }
 
-.envCode {
-  background: #0a0a0a;
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 4px;
-  padding: 10px 14px;
-  font-size: 12px;
-  color: #e50914;
-  margin: 8px 0 0;
-  overflow-x: auto;
+.pillLabel { font-size: 12px; color: rgba(255,255,255,0.35); }
+
+/* ── Tab bar ────────────────────────────────────── */
+.tabBar {
+  display: flex;
+  gap: 4px;
+  padding: 24px 56px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.45);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.18s, border-color 0.18s;
+  border-radius: 4px 4px 0 0;
+}
+
+.tab:hover { color: #e5e5e5; background: rgba(255,255,255,0.04); }
+
+.tabActive {
+  color: #e5e5e5 !important;
+  border-bottom-color: #e50914 !important;
+  background: transparent !important;
+}
+
+/* ── Panels ─────────────────────────────────────── */
+.panels {
+  padding: 28px 56px;
+  max-width: 820px;
+}
+
+.panelCard {
+  background: #141414;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+}
+
+.panelIcon {
+  font-size: 22px;
+  color: #888;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.panelTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e5e5e5;
+  margin-bottom: 5px;
+}
+
+.panelSub {
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+  line-height: 1.5;
+}
+
+/* Override DropZone/GoogleDriveSection inner padding */
+.panelCard > :last-child > * {
+  padding: 20px 24px;
+}
+
+/* ── Source list ────────────────────────────────── */
+.sourceList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 0;
+}
+
+.sourceCard {
+  padding: 14px 24px;
+  transition: background 0.15s;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.sourceCard:last-of-type { border-bottom: none; }
+.sourceCard:hover { background: rgba(255,255,255,0.03); }
+
+.sourceCardTop {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.sourceTypeIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.iconLocal { background: rgba(74,158,255,0.12); color: #4a9eff; }
+.iconDrive { background: rgba(229,9,20,0.1);    color: #e50914; }
+
+.sourceInfo { flex: 1; min-width: 0; }
+
+.sourceName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e5e5e5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sourcePath {
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
   font-family: 'Courier New', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
 }
 
+.sourceMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.sourceTypeTag { margin: 0 !important; font-size: 11px; }
+
+.comicCount {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+}
+
+.sourceActions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.addMoreBtn {
+  margin: 10px 24px;
+  border-style: dashed;
+  width: calc(100% - 48px);
+}
+
+/* ── Responsive ─────────────────────────────────── */
 @media (max-width: 680px) {
-  .header { padding: 20px 16px 12px; }
-  .content { padding: 0 16px 40px; }
+  .hero { padding: 20px 16px 0; }
+  .heroTitle { font-size: 24px; }
+  .statPills { display: none; }
+  .tabBar { padding: 16px 16px 0; }
+  .tab { padding: 8px 12px; font-size: 13px; }
+  .panels { padding: 20px 16px; }
+  .sourceCard { padding: 12px 16px; }
+  .addMoreBtn { margin: 10px 16px; width: calc(100% - 32px); }
 }
-

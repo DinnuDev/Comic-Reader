@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import {
-  Card, Button, List, Tag, Space, Modal, Form, Input,
-  Select, Typography, message, Badge, notification,
+  Button, Modal, Form, Input, Typography,
+  message, Popconfirm, Tooltip, Tag, Empty,
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, SyncOutlined,
-  FolderOpenOutlined, CloudOutlined, BookOutlined,
+  FolderOutlined, CloudOutlined, BookOutlined,
+  DatabaseOutlined, UploadOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { sourcesApi, libraryApi } from '../services/api';
@@ -14,55 +15,116 @@ import GoogleDriveSection from '../components/GoogleDrive/GoogleDriveSection';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import styles from './SourcesPage.module.css';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
-function AnimatedCard({ children, delay = 0 }) {
-  const [ref, visible] = useScrollAnimation({ threshold: 0.05 });
+function FadeIn({ children, delay = 0 }) {
+  const [ref, visible] = useScrollAnimation({ threshold: 0.04 });
   return (
-    <div ref={ref} style={{
-      opacity: visible ? 1 : 0,
-      transform: visible ? 'translateY(0)' : 'translateY(24px)',
-      transition: `opacity 0.5s ease ${delay}ms, transform 0.5s ease ${delay}ms`,
-    }}>
+    <div ref={ref}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(20px)',
+        transition: `opacity 0.45s ease ${delay}ms, transform 0.45s ease ${delay}ms`,
+      }}>
       {children}
     </div>
   );
 }
 
+// ── Source stat card ──────────────────────────────────────────────────────
+function SourceCard({ source, scanning, onScan, onDelete }) {
+  const isLocal  = source.type === 'local';
+  const isScan   = scanning === source.id;
+
+  return (
+    <div className={styles.sourceCard}>
+      <div className={styles.sourceCardTop}>
+        <div className={`${styles.sourceTypeIcon} ${isLocal ? styles.iconLocal : styles.iconDrive}`}>
+          {isLocal ? <FolderOutlined /> : <CloudOutlined />}
+        </div>
+
+        <div className={styles.sourceInfo}>
+          <div className={styles.sourceName}>{source.name}</div>
+          <div className={styles.sourcePath}>
+            {source.path || source.gdrive_folder_id || '—'}
+          </div>
+          <div className={styles.sourceMeta}>
+            <Tag
+              className={styles.sourceTypeTag}
+              color={isLocal ? 'geekblue' : 'volcano'}
+            >
+              {isLocal ? 'Local' : 'Google Drive'}
+            </Tag>
+            {source.comic_count > 0 && (
+              <span className={styles.comicCount}>
+                <BookOutlined style={{ fontSize: 11 }} />
+                {source.comic_count} comic{source.comic_count !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className={styles.sourceActions}>
+          <Tooltip title={isScan ? 'Scanning…' : 'Scan for new comics'}>
+            <Button
+              size="small"
+              icon={<SyncOutlined spin={isScan} />}
+              loading={isScan}
+              onClick={() => onScan(source.id, source.name)}
+            >
+              Scan
+            </Button>
+          </Tooltip>
+          <Popconfirm
+            title={`Remove "${source.name}"?`}
+            description="Comics from this source will be removed. Files on disk are not deleted."
+            okText="Remove"
+            okType="danger"
+            onConfirm={() => onDelete(source.id)}
+          >
+            <Button size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function SourcesPage() {
   const queryClient = useQueryClient();
   const [addModal, setAddModal] = useState(false);
   const [form] = Form.useForm();
-  const [sourceType, setSourceType] = useState('local');
   const [scanning, setScanning] = useState(null);
+  const [activeTab, setActiveTab] = useState('upload'); // upload | gdrive | local
 
   const { data: sources = [] } = useQuery({ queryKey: ['sources'], queryFn: sourcesApi.getAll });
 
-  // ── Auto-scan on source add ────────────────────────────────────────────
+  const totalComics = sources.reduce((s, src) => s + (src.comic_count || 0), 0);
+
   const addMutation = useMutation({
     mutationFn: sourcesApi.create,
     onSuccess: async (newSource) => {
       queryClient.invalidateQueries({ queryKey: ['sources'] });
-      message.success('Source added! Scanning for comics…');
+      message.success('Folder added — scanning for comics…');
       setAddModal(false);
       form.resetFields();
-      setSourceType('local');
-
       if (newSource?.id) {
         setScanning(newSource.id);
         try {
-          const result = await libraryApi.scanSource(newSource.id);
-          message.success(result.message || 'Scan complete');
+          const r = await libraryApi.scanSource(newSource.id);
+          message.success(r.message);
           queryClient.invalidateQueries({ queryKey: ['library'] });
           queryClient.invalidateQueries({ queryKey: ['recent'] });
-        } catch (err) {
-          message.error(`Scan failed: ${err.response?.data?.error || err.message}`);
+        } catch (e) {
+          message.error(e.response?.data?.error || e.message);
         } finally {
           setScanning(null);
         }
       }
     },
-    onError: (err) => message.error(err.response?.data?.error || 'Failed to add source'),
+    onError: (e) => message.error(e.response?.data?.error || 'Failed to add source'),
   });
 
   const deleteMutation = useMutation({
@@ -74,156 +136,190 @@ export default function SourcesPage() {
     },
   });
 
-  const handleScan = async (sourceId, sourceName) => {
-    setScanning(sourceId);
+  const handleScan = async (id, name) => {
+    setScanning(id);
     try {
-      const result = await libraryApi.scanSource(sourceId);
-      message.success(`${sourceName}: ${result.message}`);
+      const r = await libraryApi.scanSource(id);
+      message.success(`${name}: ${r.message}`);
       queryClient.invalidateQueries({ queryKey: ['library'] });
       queryClient.invalidateQueries({ queryKey: ['recent'] });
-    } catch (err) {
-      message.error(`Scan failed: ${err.response?.data?.error || err.message}`);
+    } catch (e) {
+      message.error(e.response?.data?.error || e.message);
     } finally {
       setScanning(null);
     }
   };
 
-  const handleDelete = (source) => {
-    Modal.confirm({
-      title: `Remove "${source.name}"?`,
-      content: 'Comics from this source will be removed. Files on disk are not deleted.',
-      okText: 'Remove',
-      okType: 'danger',
-      onOk: () => deleteMutation.mutate(source.id),
-    });
-  };
-
   const handleUploaded = (count) => {
-    message.success(`${count} comic${count > 1 ? 's' : ''} added!`);
+    message.success(`${count} comic${count > 1 ? 's' : ''} added to library!`);
     queryClient.invalidateQueries({ queryKey: ['library'] });
     queryClient.invalidateQueries({ queryKey: ['sources'] });
   };
 
+  const TABS = [
+    { id: 'upload', label: 'Upload Files',    icon: <UploadOutlined /> },
+    { id: 'gdrive', label: 'Google Drive',     icon: <CloudOutlined /> },
+    { id: 'local',  label: 'Local Folders',    icon: <FolderOutlined /> },
+  ];
+
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <Title level={4} className={styles.title}>Sources</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddModal(true)}>
-          Add Local Folder
-        </Button>
+
+      {/* ── Hero ─────────────────────────────────────────────────────── */}
+      <div className={styles.hero}>
+        <div>
+          <h1 className={styles.heroTitle}>Sources</h1>
+          <p className={styles.heroSub}>Manage where COMIX finds your comics</p>
+        </div>
+
+        {/* Stats pills */}
+        <div className={styles.statPills}>
+          <div className={styles.pill}>
+            <DatabaseOutlined className={styles.pillIcon} />
+            <span className={styles.pillVal}>{sources.length}</span>
+            <span className={styles.pillLabel}>Source{sources.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className={styles.pill}>
+            <BookOutlined className={styles.pillIcon} />
+            <span className={styles.pillVal}>{totalComics}</span>
+            <span className={styles.pillLabel}>Comic{totalComics !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
       </div>
 
-      <div className={styles.content}>
-
-        {/* ── UPLOAD ───────────────────────────────────────────────────── */}
-        <AnimatedCard delay={0}>
-          <Card title={<><BookOutlined /> Upload Comics</>} className={styles.card}>
-            <DropZone onUploaded={handleUploaded} />
-          </Card>
-        </AnimatedCard>
-
-        {/* ── GOOGLE DRIVE ─────────────────────────────────────────────── */}
-        <AnimatedCard delay={80}>
-          <Card title={<><CloudOutlined /> Google Drive</>} className={styles.card}>
-            <GoogleDriveSection />
-          </Card>
-        </AnimatedCard>
-
-        {/* ── LOCAL SOURCES LIST ───────────────────────────────────────── */}
-        <AnimatedCard delay={160}>
-          <Card
-            title="Library Sources"
-            className={styles.card}
-            extra={
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                {sources.length} source{sources.length !== 1 ? 's' : ''}
-              </Text>
-            }
+      {/* ── Tab nav ──────────────────────────────────────────────────── */}
+      <div className={styles.tabBar}>
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            className={`${styles.tab} ${activeTab === t.id ? styles.tabActive : ''}`}
+            onClick={() => setActiveTab(t.id)}
           >
-            {sources.length === 0 ? (
-              <div className={styles.empty}>
-                <FolderOpenOutlined style={{ fontSize: 40, color: '#444' }} />
-                <Text type="secondary">No sources yet. Add a local folder or connect Google Drive.</Text>
-              </div>
-            ) : (
-              <List
-                dataSource={sources}
-                renderItem={(source) => (
-                  <List.Item
-                    key={source.id}
-                    actions={[
-                      <Button
-                        key="scan"
-                        icon={<SyncOutlined spin={scanning === source.id} />}
-                        loading={scanning === source.id}
-                        onClick={() => handleScan(source.id, source.name)}
-                        size="small"
-                      >
-                        Scan
-                      </Button>,
-                      <Button
-                        key="del"
-                        danger
-                        icon={<DeleteOutlined />}
-                        size="small"
-                        onClick={() => handleDelete(source)}
-                      />,
-                    ]}
-                  >
-                    <List.Item.Meta
-                      avatar={
-                        source.type === 'gdrive'
-                          ? <CloudOutlined style={{ fontSize: 24, color: '#e50914' }} />
-                          : <FolderOpenOutlined style={{ fontSize: 24, color: '#4a9eff' }} />
-                      }
-                      title={
-                        <Space size={6}>
-                          <span>{source.name}</span>
-                          <Tag color={source.type === 'gdrive' ? 'blue' : 'green'} style={{ margin: 0 }}>
-                            {source.type === 'gdrive' ? 'Drive' : 'Local'}
-                          </Tag>
-                          {source.comic_count > 0 && (
-                            <Badge count={source.comic_count} color="#e50914" />
-                          )}
-                        </Space>
-                      }
-                      description={
-                        <Text type="secondary" ellipsis style={{ fontSize: 12 }}>
-                          {source.path || source.gdrive_folder_id || '—'}
-                        </Text>
-                      }
-                    />
-                  </List.Item>
-                )}
-              />
-            )}
-          </Card>
-        </AnimatedCard>
+            {t.icon}
+            <span>{t.label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* ── ADD LOCAL FOLDER MODAL ───────────────────────────────────────── */}
+      {/* ── Tab panels ───────────────────────────────────────────────── */}
+      <div className={styles.panels}>
+
+        {activeTab === 'upload' && (
+          <FadeIn delay={0}>
+            <div className={styles.panelCard}>
+              <div className={styles.panelHeader}>
+                <UploadOutlined className={styles.panelIcon} />
+                <div>
+                  <div className={styles.panelTitle}>Upload Comics</div>
+                  <div className={styles.panelSub}>
+                    Drop CBZ, CBR, PDF or ZIP files — up to 5 GB each. Comics appear in your
+                    library immediately while pages are indexed in the background.
+                  </div>
+                </div>
+              </div>
+              <DropZone onUploaded={handleUploaded} />
+            </div>
+          </FadeIn>
+        )}
+
+        {activeTab === 'gdrive' && (
+          <FadeIn delay={0}>
+            <div className={styles.panelCard}>
+              <div className={styles.panelHeader}>
+                <CloudOutlined className={styles.panelIcon} style={{ color: '#e50914' }} />
+                <div>
+                  <div className={styles.panelTitle}>Google Drive</div>
+                  <div className={styles.panelSub}>
+                    Connect your Google account to read comics stored in Drive.
+                    Navigate your folders and add any folder as a library source.
+                  </div>
+                </div>
+              </div>
+              <GoogleDriveSection />
+            </div>
+          </FadeIn>
+        )}
+
+        {activeTab === 'local' && (
+          <FadeIn delay={0}>
+            <div className={styles.panelCard}>
+              <div className={styles.panelHeader}>
+                <FolderOutlined className={styles.panelIcon} style={{ color: '#4a9eff' }} />
+                <div>
+                  <div className={styles.panelTitle}>Local Folders</div>
+                  <div className={styles.panelSub}>
+                    Add a folder on this computer. COMIX will scan it for CBZ, CBR, PDF and
+                    image-folder comics and auto-index them.
+                  </div>
+                </div>
+              </div>
+
+              {/* Existing sources */}
+              {sources.length === 0 ? (
+                <Empty
+                  image={<FolderOutlined style={{ fontSize: 44, color: '#333' }} />}
+                  description={<Text type="secondary">No sources yet</Text>}
+                  style={{ padding: '24px 0' }}
+                >
+                  <Button type="primary" icon={<PlusOutlined />}
+                    onClick={() => setAddModal(true)}
+                    style={{ background: '#e50914', borderColor: '#e50914' }}>
+                    Add Folder
+                  </Button>
+                </Empty>
+              ) : (
+                <div className={styles.sourceList}>
+                  {sources.map(src => (
+                    <SourceCard
+                      key={src.id}
+                      source={src}
+                      scanning={scanning}
+                      onScan={handleScan}
+                      onDelete={(id) => deleteMutation.mutate(id)}
+                    />
+                  ))}
+                  <Button
+                    icon={<PlusOutlined />}
+                    onClick={() => setAddModal(true)}
+                    className={styles.addMoreBtn}
+                  >
+                    Add another folder
+                  </Button>
+                </div>
+              )}
+            </div>
+          </FadeIn>
+        )}
+
+      </div>
+
+      {/* ── Add Local Folder modal ───────────────────────────────────── */}
       <Modal
-        title="Add Local Folder Source"
+        title={
+          <span>
+            <FolderOutlined style={{ color: '#4a9eff', marginRight: 8 }} />
+            Add Local Folder
+          </span>
+        }
         open={addModal}
         onOk={() => form.submit()}
-        onCancel={() => { setAddModal(false); form.resetFields(); setSourceType('local'); }}
+        onCancel={() => { setAddModal(false); form.resetFields(); }}
         okText="Add & Scan"
+        okButtonProps={{ style: { background: '#e50914', borderColor: '#e50914' } }}
         confirmLoading={addMutation.isPending}
+        width={480}
       >
-        <Form form={form} layout="vertical" initialValues={{ type: 'local' }} onFinish={addMutation.mutate}>
-          <Form.Item name="type" style={{ display: 'none' }}>
-            <Input value="local" />
-          </Form.Item>
-          <Form.Item name="name" label="Source Name" rules={[{ required: true }]}>
-            <Input placeholder="My Comics" />
+        <Form form={form} layout="vertical" onFinish={v => addMutation.mutate({ ...v, type: 'local' })}>
+          <Form.Item name="name" label="Display Name" rules={[{ required: true }]}>
+            <Input placeholder="My Comics" prefix={<BookOutlined />} />
           </Form.Item>
           <Form.Item
             name="path"
             label="Folder Path"
             rules={[{ required: true }]}
-            extra="Full path to your comics folder — e.g. C:\Comics or /home/user/comics"
+            extra="Full path to your comics folder — e.g. C:\Comics"
           >
-            <Input placeholder="C:\Comics" />
+            <Input placeholder="C:\Comics" prefix={<FolderOutlined />} />
           </Form.Item>
         </Form>
       </Modal>
