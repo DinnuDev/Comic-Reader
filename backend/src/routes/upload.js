@@ -152,13 +152,29 @@ router.delete('/:comicId', (req, res) => {
 });
 
 // ── Multer error handler ──────────────────────────────────────────────────
+// Catches errors from the upload middleware BEFORE they reach the global handler.
+// Handles both multer v1 and v2 error shapes.
 router.use((err, req, res, next) => {
-  if (err.code === 'LIMIT_FILE_SIZE') {
+  const isFileSizeError =
+    err.code === 'LIMIT_FILE_SIZE' ||
+    (err.message && err.message.toLowerCase().includes('file too large'));
+
+  if (isFileSizeError) {
     return res.status(413).json({
-      error: `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024 / 1024} GB.`,
+      error: `File too large. Maximum allowed size is ${(MAX_FILE_SIZE / 1024 / 1024 / 1024).toFixed(0)} GB.`,
     });
   }
-  res.status(400).json({ error: err.message });
+
+  if (err.code === 'LIMIT_FILE_COUNT') {
+    return res.status(400).json({ error: 'Too many files. Upload up to 10 files at once.' });
+  }
+
+  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+    return res.status(400).json({ error: 'Unexpected field name in upload request.' });
+  }
+
+  // Pass any other errors to the global handler
+  next(err);
 });
 
 module.exports = router;

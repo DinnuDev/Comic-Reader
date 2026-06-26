@@ -83,9 +83,26 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().t
 // 404
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
-// Error handler
+// Error handler — catches both app errors and multer upload errors
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  // Multer file-size exceeded (LIMIT_FILE_SIZE)
+  const isFileSizeError =
+    err.code === 'LIMIT_FILE_SIZE' ||
+    (err.message && err.message.toLowerCase().includes('file too large'));
+
+  if (isFileSizeError) {
+    return res.status(413).json({
+      error: 'File too large. Maximum allowed size is 5 GB.',
+    });
+  }
+
+  // Multer file-count exceeded
+  if (err.code === 'LIMIT_FILE_COUNT') {
+    return res.status(400).json({ error: 'Too many files. Maximum is 10 per upload.' });
+  }
+
+  // Generic
+  console.error('[error]', err.message);
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 

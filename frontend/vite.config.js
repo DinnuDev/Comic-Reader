@@ -10,10 +10,19 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
         cookieDomainRewrite: 'localhost',
+        // No timeout — large file uploads (5 GB) take several minutes
+        timeout: 0,
+        proxyTimeout: 0,
         configure: (proxy) => {
-          // Forward all headers including cookies
           proxy.on('proxyReq', (proxyReq, req) => {
             if (req.headers.cookie) proxyReq.setHeader('Cookie', req.headers.cookie);
+          });
+          proxy.on('error', (err, req, res) => {
+            // Don't crash on proxy errors (e.g. client abort during large upload)
+            if (!res.headersSent) {
+              res.writeHead(502, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Proxy error: ' + err.message }));
+            }
           });
         },
       },
