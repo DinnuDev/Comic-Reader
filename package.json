@@ -4,10 +4,13 @@
   "private": true,
   "scripts": {
     "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "dev": "concurrently --kill-others-on-fail --names API,APP --prefix-colors cyan,magenta \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
-    "dev": "start cmd /k \"npm run dev:backend\" && start cmd /k \"npm run dev:frontend\"",
-    "start:backend": "npm start --prefix backend",
-    "start:frontend": "npm run preview --prefix frontend"
+    "build": "npm run build --prefix frontend",
+    "start": "concurrently --names API,APP \"npm start --prefix backend\" \"npm run preview --prefix frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
   }
 }

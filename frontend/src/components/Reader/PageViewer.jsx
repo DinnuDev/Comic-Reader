@@ -4,6 +4,7 @@ import React, {
 import { useSpring, animated } from '@react-spring/web';
 import { useDrag, usePinch } from '@use-gesture/react';
 import { readerApi } from '../../services/api';
+import { usePrefetchQueue } from '../../hooks/useScrollAnimation';
 import styles from './PageViewer.module.css';
 
 const MIN_ZOOM = 1;
@@ -206,9 +207,16 @@ export default function PageViewer({
       smartZoomToPanel(e.clientX, e.clientY);
     }
     propsRef.current.onTap?.();
-  }, [applyZoom, applyZoomReset, smartZoomToPanel]); // stable: applyZoom/applyZoomReset only dep on imgApi/clampPan
+  }, [applyZoom, applyZoomReset, smartZoomToPanel]);
 
-  const pageUrl = readerApi.getPageUrl(comicId, currentPage);
+  // ── Smart prefetch: load 3 ahead, 1 behind, using a persistent cache ─────
+  const getPageUrl = useCallback(
+    (page) => readerApi.getPageUrl(comicId, page),
+    [comicId]
+  );
+  usePrefetchQueue(getPageUrl, currentPage, totalPages, 3, 1);
+
+  const pageUrl = getPageUrl(currentPage);
 
   return (
     <div
@@ -274,8 +282,12 @@ export default function PageViewer({
         </div>
       )}
 
-      <link rel="prefetch" href={readerApi.getPageUrl(comicId, currentPage + 1)} />
-      {currentPage > 0 && <link rel="prefetch" href={readerApi.getPageUrl(comicId, currentPage - 1)} />}
+      {/* Loading indicator — thin top bar */}
+      {!imageLoaded && (
+        <div className={styles.loadBar}>
+          <div className={styles.loadBarFill} />
+        </div>
+      )}
     </div>
   );
 }

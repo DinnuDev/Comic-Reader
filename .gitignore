@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.npm
+
+# Build output
+frontend/dist/
+frontend/dist-ssr/
+
+# Runtime data
+backend/data/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Secrets / env
+.env
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Session files
+backend/data/sessions/
+
+# Uploaded comics (user data, not source)
+backend/data/uploads/
+backend/data/covers/
+backend/data/cache/
+
+# Lock files (keep package-lock but not node-gyp cache)
+.node_gyp/

@@ -1,0 +1,141 @@
+.hero {
+  position: relative;
+  width: 100%;
+  height: 62vh;
+  min-height: 380px;
+  max-height: 620px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+
+/* Backdrop */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.backdropImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  filter: blur(3px) brightness(0.55);
+  transform: scale(1.04);
+}
+
+.backdropGradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(10,10,10,0.3) 40%,
+    rgba(10,10,10,0.8) 70%,
+    #0a0a0a 100%
+  );
+}
+
+/* Content */
+.content {
+  position: relative;
+  z-index: 1;
+  padding: 0 56px 48px;
+  max-width: 640px;
+}
+
+.series {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #e50914;
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: clamp(24px, 4vw, 44px);
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.15;
+  margin: 0 0 14px;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.metaTag {
+  background: rgba(255,255,255,0.1) !important;
+  border-color: rgba(255,255,255,0.15) !important;
+  color: rgba(255,255,255,0.8) !important;
+  font-size: 11px;
+  border-radius: 3px;
+}
+
+.progressWrap {
+  width: 260px;
+  height: 3px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  background: #e50914;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.readBtn {
+  background: #e50914 !important;
+  border-color: #e50914 !important;
+  color: #fff !important;
+  font-weight: 700;
+  font-size: 15px;
+  height: 44px;
+  padding: 0 28px;
+  border-radius: 4px;
+  transition: transform 0.15s, background 0.15s !important;
+}
+
+.readBtn:hover {
+  background: #f40612 !important;
+  transform: scale(1.03);
+}
+
+.favBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.4);
+  background: rgba(0,0,0,0.4);
+  color: rgba(255,255,255,0.7);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.favBtn:hover { border-color: #fff; color: #fff; background: rgba(255,255,255,0.1); }
+.favActive { color: #e50914 !important; border-color: #e50914 !important; }
+
+@media (max-width: 600px) {
+  .content { padding: 0 20px 32px; }
+  .title { font-size: 22px; }
+}

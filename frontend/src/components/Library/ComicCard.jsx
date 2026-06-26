@@ -1,63 +1,92 @@
-import React from 'react';
-import { Tooltip } from 'antd';
+import React, { memo } from 'react';
 import { HeartFilled, HeartOutlined, PlayCircleFilled } from '@ant-design/icons';
 import { readerApi } from '../../services/api';
+import { useLazyImage } from '../../hooks/useScrollAnimation';
 import styles from './ComicCard.module.css';
 
-export default function ComicCard({ comic, onRead, onFavorite }) {
+function ComicCard({ comic, onRead, onFavorite, size = 'md' }) {
+  const [hovered, setHovered] = React.useState(false);
+  const rawCoverUrl = comic.cover_path || readerApi.getCoverUrl(comic.id);
+  const [imgRef, lazySrc, , onImgLoad] = useLazyImage(rawCoverUrl);
   const progress = comic.total_pages > 0
     ? Math.round((comic.current_page / comic.total_pages) * 100)
     : 0;
 
-  const coverUrl = comic.cover_path
-    ? comic.cover_path
-    : readerApi.getCoverUrl(comic.id);
+  const actionLabel = progress > 0 && progress < 100 ? `${progress}%` : progress === 100 ? 'Done' : null;
 
   return (
-    <div className={styles.card} onClick={onRead}>
-      <div className={styles.coverWrapper}>
+    <div
+      className={`${styles.card} ${styles[size]} ${hovered ? styles.hovered : ''}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={onRead}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && onRead()}
+      aria-label={`Read ${comic.title}`}
+    >
+      {/* Cover */}
+      <div className={styles.coverWrap}>
         <img
-          src={coverUrl}
+          ref={imgRef}
+          src={lazySrc || ''}
           alt={comic.title}
           className={styles.cover}
-          loading="lazy"
-          onError={e => { e.target.src = 'data:image/svg+xml,' + encodeURIComponent(placeholderSvg(comic.title)); }}
+          onLoad={onImgLoad}
+          style={{ opacity: lazySrc ? 1 : 0 }}
         />
-        <div className={styles.overlay}>
-          <PlayCircleFilled className={styles.playIcon} />
-        </div>
-        {/* Favorite button */}
-        <button
-          className={styles.favBtn}
-          onClick={e => { e.stopPropagation(); onFavorite(); }}
-          aria-label={comic.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
-        >
-          {comic.is_favorite
-            ? <HeartFilled style={{ color: '#e94560' }} />
-            : <HeartOutlined style={{ color: '#fff' }} />}
-        </button>
-        {/* Reading progress */}
+        {/* Fallback letter when no cover yet */}
+        {!lazySrc && (
+          <div className={styles.coverFallback}>
+            <span>{(comic.title || '?')[0].toUpperCase()}</span>
+          </div>
+        )}
+        {/* Progress bar */}
         {progress > 0 && progress < 100 && (
-          <div className={styles.progressBar}>
+          <div className={styles.progressRail}>
             <div className={styles.progressFill} style={{ width: `${progress}%` }} />
           </div>
         )}
-        {progress === 100 && (
-          <div className={styles.readBadge}>READ</div>
-        )}
+        {/* Play icon — hover */}
+        <div className={styles.playOverlay}>
+          <PlayCircleFilled className={styles.playIcon} />
+        </div>
       </div>
-      <Tooltip title={comic.title} placement="bottom">
-        <div className={styles.title}>{comic.title}</div>
-      </Tooltip>
-      {comic.series && <div className={styles.series}>{comic.series}</div>}
+
+      {/* Hover info panel */}
+      <div className={styles.infoPanel}>
+        <div className={styles.infoPanelInner}>
+          <div className={styles.infoTitle}>{comic.title}</div>
+          <div className={styles.infoMeta}>
+            {comic.series && <span className={styles.series}>{comic.series}</span>}
+            {comic.page_count > 0 && <span>{comic.page_count} pages</span>}
+            {actionLabel && <span className={styles.progress}>{actionLabel} read</span>}
+          </div>
+          <div className={styles.infoActions}>
+            <button
+              className={styles.playBtn}
+              onClick={e => { e.stopPropagation(); onRead(); }}
+              aria-label="Read"
+            >
+              <PlayCircleFilled />
+            </button>
+            <button
+              className={`${styles.favIconBtn} ${comic.is_favorite ? styles.favActive : ''}`}
+              onClick={e => { e.stopPropagation(); onFavorite(); }}
+              aria-label="Favorite"
+            >
+              {comic.is_favorite ? <HeartFilled /> : <HeartOutlined />}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-function placeholderSvg(title) {
-  const letter = (title || '?')[0].toUpperCase();
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450" viewBox="0 0 300 450">
-    <rect width="300" height="450" fill="#1a1a2e"/>
-    <text x="150" y="240" font-size="100" text-anchor="middle" fill="#e94560" font-family="sans-serif">${letter}</text>
-  </svg>`;
-}
+export default memo(ComicCard, (prev, next) =>
+  prev.comic.id === next.comic.id &&
+  prev.comic.is_favorite === next.comic.is_favorite &&
+  prev.comic.current_page === next.comic.current_page &&
+  prev.size === next.size
+);

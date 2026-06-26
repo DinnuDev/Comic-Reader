@@ -1,17 +1,21 @@
 import axios from 'axios';
 
+// Default API client (30 s timeout for regular calls)
 const api = axios.create({
   baseURL: '/api',
   timeout: 30000,
+});
+
+// No-timeout client for large file uploads (can take minutes)
+const uploadClient = axios.create({
+  baseURL: '/api',
+  timeout: 0,  // no timeout
 });
 
 // Global response error handler
 api.interceptors.response.use(
   res => res,
   err => {
-    const status = err.response?.status;
-    const msg = err.response?.data?.error || err.message;
-    // Don't throw on 401 (handled per-call) or network errors
     return Promise.reject(err);
   }
 );
@@ -61,16 +65,18 @@ export const gdriveApi = {
   listFiles: (folderId) => api.get('/gdrive/files', { params: { folderId } }).then(r => r.data),
 };
 
-// Upload
+// Upload — uses no-timeout client, supports AbortController signal
 export const uploadApi = {
-  uploadFiles: (files, onProgress) => {
+  uploadFiles: (files, onProgress, signal) => {
     const formData = new FormData();
     files.forEach(f => formData.append('files', f));
-    return api.post('/upload', formData, {
+    return uploadClient.post('/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: onProgress,
+      signal,
     }).then(r => r.data);
   },
+  getStatus: (comicId) => api.get(`/upload/status/${comicId}`).then(r => r.data),
   deleteUpload: (comicId) => api.delete(`/upload/${comicId}`).then(r => r.data),
 };
 

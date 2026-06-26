@@ -1,0 +1,87 @@
+/* Shimmer keyframe */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+
+.shimmer {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    #1a1a1a 25%,
+    #2a2a2a 50%,
+    #1a1a1a 75%
+  );
+  background-size: 600px 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+/* Card sizes */
+.card { flex-shrink: 0; }
+.sm { width: 130px; }
+.md { width: 160px; }
+.lg { width: 200px; }
+
+.cover {
+  aspect-ratio: 2 / 3;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #1a1a1a;
+}
+
+.lines {
+  padding: 8px 4px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.line {
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #1a1a1a;
+  position: relative;
+}
+
+.line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+.lineTitle { width: 80%; }
+.lineMeta  { width: 50%; }
+
+/* Skeleton section */
+.section { padding: 0 0 32px; }
+
+.skeletonHeading {
+  width: 200px;
+  height: 20px;
+  border-radius: 4px;
+  margin: 0 56px 16px;
+  background: #1a1a1a;
+  overflow: hidden;
+  position: relative;
+}
+
+.skeletonHeading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+.track {
+  display: flex;
+  gap: 8px;
+  padding: 8px 56px 16px;
+  overflow: hidden;
+}

@@ -1,15 +1,100 @@
-/* Global styles */
+/* â”€â”€ Global reset & Netflix palette â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 :root {
-  --bg-primary: #0d0d0d;
-  --bg-secondary: #1a1a2e;
-  --bg-card: #16213e;
-  --accent: #e94560;
-  --accent-hover: #c73652;
-  --text-primary: #eaeaea;
-  --text-muted: #888;
-  --border: #2a2a4a;
-  --reader-bg: #000;
+  --bg:       #0a0a0a;
+  --bg-card:  #141414;
+  --bg-hover: #181818;
+  --red:      #e50914;
+  --red-hover:#f40612;
+  --text:     #e5e5e5;
+  --text-dim: rgba(255,255,255,0.55);
+  --border:   rgba(255,255,255,0.08);
 }
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0; padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Ant Design dark theme overrides */
+.ant-layout { background: transparent !important; }
+.ant-drawer-content { background: #141414 !important; }
+.ant-drawer-header { background: #141414 !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; }
+.ant-drawer-title { color: #e5e5e5 !important; }
+.ant-modal-content { background: #181818 !important; }
+.ant-modal-header { background: #181818 !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; }
+.ant-modal-title { color: #e5e5e5 !important; }
+.ant-select-dropdown { background: #1f1f1f !important; }
+.ant-card { background: #141414 !important; border: 1px solid rgba(255,255,255,0.06) !important; }
+.ant-card-head { border-bottom: 1px solid rgba(255,255,255,0.08) !important; color: #e5e5e5 !important; }
+.ant-list-item { border-color: rgba(255,255,255,0.06) !important; color: #e5e5e5 !important; }
+.ant-form-item-label > label { color: rgba(255,255,255,0.7) !important; }
+.ant-collapse { background: transparent !important; border: none !important; }
+.ant-collapse-header { color: rgba(255,255,255,0.65) !important; }
+.ant-steps-item-title { color: rgba(255,255,255,0.75) !important; }
+.ant-steps-item-description { color: rgba(255,255,255,0.45) !important; }
+.ant-tag { border-radius: 3px !important; }
+.ant-input { background: rgba(255,255,255,0.07) !important; border-color: rgba(255,255,255,0.15) !important; color: #e5e5e5 !important; }
+.ant-input-number { background: rgba(255,255,255,0.07) !important; }
+.ant-select-selector { background: rgba(255,255,255,0.07) !important; border-color: rgba(255,255,255,0.15) !important; color: #e5e5e5 !important; }
+.ant-btn-default { background: rgba(255,255,255,0.08) !important; border-color: rgba(255,255,255,0.15) !important; color: #e5e5e5 !important; }
+.ant-btn-default:hover { background: rgba(255,255,255,0.14) !important; color: #fff !important; }
+
+/* ── Scroll-animation utility classes ──────────── */
+.animate-fade-up {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.animate-fade-up.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.animate-fade-in {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.animate-fade-in.visible { opacity: 1; }
+
+/* Stagger delays */
+.delay-1 { transition-delay: 60ms !important; }
+.delay-2 { transition-delay: 120ms !important; }
+.delay-3 { transition-delay: 180ms !important; }
+.delay-4 { transition-delay: 240ms !important; }
+.delay-5 { transition-delay: 300ms !important; }
+
+/* ── No-select utility ──────────────────────────── */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+/* Ant message/notification dark */
+.ant-message-notice-content { background: #1f1f1f !important; color: #e5e5e5 !important; border: 1px solid rgba(255,255,255,0.1) !important; }
+.ant-notification-notice { background: #1f1f1f !important; border: 1px solid rgba(255,255,255,0.1) !important; }
+.ant-notification-notice-message { color: #e5e5e5 !important; }
+.ant-notification-notice-description { color: rgba(255,255,255,0.65) !important; }
+
 
 * { box-sizing: border-box; }
 

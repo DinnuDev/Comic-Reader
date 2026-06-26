@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Card, Button, List, Tag, Space, Modal, Form, Input,
-  Select, Typography, message, Alert, Badge, Tooltip,
+  Select, Typography, message, Alert, Badge,
   Steps, Collapse, notification,
 } from 'antd';
 import {
@@ -13,9 +13,26 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { sourcesApi, gdriveApi, libraryApi } from '../services/api';
 import DropZone from '../components/Upload/DropZone';
+import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import styles from './SourcesPage.module.css';
 
 const { Title, Text, Paragraph, Link } = Typography;
+
+function AnimatedCard({ children, delay = 0 }) {
+  const [ref, visible] = useScrollAnimation({ threshold: 0.05 });
+  return (
+    <div
+      ref={ref}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(24px)',
+        transition: `opacity 0.5s ease ${delay}ms, transform 0.5s ease ${delay}ms`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default function SourcesPage() {
   const queryClient = useQueryClient();
@@ -126,11 +143,14 @@ export default function SourcesPage() {
       <div className={styles.content}>
 
         {/* Upload section */}
-        <Card title={<><BookOutlined /> Upload Comics</>} className={styles.card}>
-          <DropZone onUploaded={handleUploaded} />
-        </Card>
+        <AnimatedCard delay={0}>
+          <Card title={<><BookOutlined /> Upload Comics</>} className={styles.card}>
+            <DropZone onUploaded={handleUploaded} />
+          </Card>
+        </AnimatedCard>
 
         {/* Google Drive section */}
+        <AnimatedCard delay={80}>
         <Card
           title={<><CloudOutlined /> Google Drive</>}
           className={styles.card}
@@ -195,8 +215,10 @@ GOOGLE_REDIRECT_URI=http://localhost:3001/api/gdrive/callback`}</pre>
             </Space>
           )}
         </Card>
+        </AnimatedCard>
 
         {/* Source list */}
+        <AnimatedCard delay={160}>
         <Card
           title="Library Sources"
           className={styles.card}
@@ -260,6 +282,7 @@ GOOGLE_REDIRECT_URI=http://localhost:3001/api/gdrive/callback`}</pre>
             />
           )}
         </Card>
+        </AnimatedCard>
       </div>
 
       {/* Add source modal */}

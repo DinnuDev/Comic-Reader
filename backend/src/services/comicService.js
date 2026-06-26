@@ -1,34 +1,94 @@
+/**
+ * comicService.js
+ *
+ * All ZIP/CBZ operations use `unzipper` (streaming, random-access).
+ * It reads the ZIP central directory from the end of the file, then
+ * seeks directly to individual entries — so a 5 GB CBZ never loads
+ * more than one page's worth of compressed data into memory at a time.
+ */
+
+'use strict';
+
 const fs = require('fs');
 const path = require('path');
-const AdmZip = require('adm-zip');
+const unzipper = require('unzipper');
 const Jimp = require('jimp');
 const mime = require('mime-types');
 const { glob } = require('glob');
 const db = require('../db/database');
 const { v4: uuidv4 } = require('uuid');
 
-const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.bmp'];
-const COMIC_EXTENSIONS = ['.cbz', '.cbr', '.zip', '.pdf'];
+const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.bmp']);
+const COMIC_EXTS = ['.cbz', '.cbr', '.zip', '.pdf'];
+
+// ── ZIP helpers (streaming, memory-efficient) ─────────────────────────────
 
 /**
- * Scan a source directory for comics and add them to the DB.
+ * Open a ZIP file and return its sorted list of image entries.
+ * unzipper reads only the central directory — no full-file scan for large ZIPs.
  */
+async function openZipImages(filePath) {
+  const directory = await unzipper.Open.file(filePath);
+  return directory.files
+    .filter(f => !f.type || f.type === 'File')
+    .filter(f => IMAGE_EXTS.has(path.extname(f.path).toLowerCase()))
+    .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: 'base' }));
+}
+
+/**
+ * Extract a single entry from a ZIP as a Buffer.
+ * Only the compressed bytes of that one entry are read from disk.
+ */
+async function extractZipEntry(entry) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    const stream = entry.stream();
+    stream.on('data', chunk => chunks.push(chunk));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+    stream.on('error', reject);
+  });
+}
+
+// ── Page counting ─────────────────────────────────────────────────────────
+
+function countImagesInDir(dirPath) {
+  try {
+    return fs.readdirSync(dirPath)
+      .filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase())).length;
+  } catch { return 0; }
+}
+
+async function countPages(filePath, ext) {
+  try {
+    if (ext === 'cbz' || ext === 'zip') {
+      // Opens central directory only — fast even for 5 GB files
+      const entries = await openZipImages(filePath);
+      return entries.length;
+    }
+    if (ext === 'pdf') {
+      const pdfParse = require('pdf-parse');
+      const data = await pdfParse(fs.readFileSync(filePath));
+      return data.numpages;
+    }
+    return 0;
+  } catch { return 0; }
+}
+
+// ── Source scanning ───────────────────────────────────────────────────────
+
 async function scanSource(source) {
-  if (source.type !== 'local') throw new Error('Only local sources supported in comicService.scanSource');
+  if (source.type !== 'local') throw new Error('Only local sources supported');
 
   const basePath = path.resolve(source.path);
-  const patterns = [...COMIC_EXTENSIONS.map(ext => `**/*${ext}`), '*/'];
+  const files = await glob('**/*.{cbz,cbr,zip,pdf}', { cwd: basePath, absolute: true, nocase: true });
 
-  // Find comic files
-  const files = await glob(`**/*.{cbz,cbr,zip,pdf}`, { cwd: basePath, absolute: true, nocase: true });
-
-  // Also find directories that contain images (treat as comics)
-  const dirs = await glob(`*/`, { cwd: basePath, absolute: true });
+  const dirs = await glob('*/', { cwd: basePath, absolute: true });
   const imageDirs = [];
   for (const dir of dirs) {
     const contents = fs.readdirSync(dir);
-    const hasImages = contents.some(f => IMAGE_EXTENSIONS.includes(path.extname(f).toLowerCase()));
-    if (hasImages) imageDirs.push(dir.replace(/\/$/, ''));
+    if (contents.some(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()))) {
+      imageDirs.push(dir.replace(/\/$/, ''));
+    }
   }
 
   const allComics = [...files, ...imageDirs];
@@ -42,17 +102,20 @@ async function scanSource(source) {
     const isDir = stat.isDirectory();
     const ext = isDir ? 'folder' : path.extname(filePath).toLowerCase().replace('.', '');
     const title = path.basename(filePath, path.extname(filePath));
-
     const id = uuidv4();
-    const pageCount = isDir ? countImagesInDir(filePath) : await countPages(filePath, ext);
+
+    // For very large files, register immediately with page_count = 0
+    // then count + generate cover in the background
+    const isLarge = stat.size > 200 * 1024 * 1024; // > 200 MB = large
+    const pageCount = isLarge ? 0 : (isDir ? countImagesInDir(filePath) : await countPages(filePath, ext));
 
     db.prepare(`
       INSERT INTO comics (id, source_id, title, file_path, file_type, file_size, page_count)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(id, source.id, title, filePath, ext, isDir ? 0 : stat.size, pageCount);
 
-    // Generate cover asynchronously
     generateCoverAsync(id, filePath, ext);
+    if (isLarge) updatePageCountAsync(id, filePath, ext);
 
     added++;
   }
@@ -60,28 +123,15 @@ async function scanSource(source) {
   return added;
 }
 
-function countImagesInDir(dirPath) {
+/** Update page_count in background for large files */
+async function updatePageCountAsync(comicId, filePath, ext) {
   try {
-    return fs.readdirSync(dirPath)
-      .filter(f => IMAGE_EXTENSIONS.includes(path.extname(f).toLowerCase())).length;
-  } catch { return 0; }
+    const count = await countPages(filePath, ext);
+    db.prepare('UPDATE comics SET page_count = ? WHERE id = ?').run(count, comicId);
+  } catch {}
 }
 
-async function countPages(filePath, ext) {
-  try {
-    if (ext === 'cbz' || ext === 'zip') {
-      const zip = new AdmZip(filePath);
-      return zip.getEntries().filter(e => IMAGE_EXTENSIONS.includes(path.extname(e.name).toLowerCase())).length;
-    }
-    if (ext === 'pdf') {
-      // Quick page count from PDF
-      const pdfParse = require('pdf-parse');
-      const data = await pdfParse(fs.readFileSync(filePath));
-      return data.numpages;
-    }
-    return 0;
-  } catch { return 0; }
-}
+// ── Cover generation ──────────────────────────────────────────────────────
 
 async function generateCoverAsync(comicId, filePath, ext) {
   try {
@@ -91,32 +141,28 @@ async function generateCoverAsync(comicId, filePath, ext) {
 
     const coverPath = path.join(coversDir, `${comicId}.jpg`);
     const img = await Jimp.read(buffer);
-    img.cover(300, 450).quality(85).write(coverPath);
+    await img.cover(300, 450).quality(85).writeAsync(coverPath);
     db.prepare('UPDATE comics SET cover_path = ? WHERE id = ?').run(`/covers/${comicId}.jpg`, comicId);
-  } catch (e) {
-    // Cover generation is optional
+  } catch {
+    // Cover generation is optional, fail silently
   }
 }
 
-/**
- * Get ordered list of page info for a comic.
- */
+// ── Page list ─────────────────────────────────────────────────────────────
+
 async function getPageList(comic) {
   const { file_path, file_type } = comic;
 
   if (file_type === 'folder') {
     const files = fs.readdirSync(file_path)
-      .filter(f => IMAGE_EXTENSIONS.includes(path.extname(f).toLowerCase()))
+      .filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
       .sort();
     return files.map((f, i) => ({ index: i, name: f }));
   }
 
   if (file_type === 'cbz' || file_type === 'zip') {
-    const zip = new AdmZip(file_path);
-    const entries = zip.getEntries()
-      .filter(e => IMAGE_EXTENSIONS.includes(path.extname(e.name).toLowerCase()))
-      .sort((a, b) => a.entryName.localeCompare(b.entryName, undefined, { numeric: true }));
-    return entries.map((e, i) => ({ index: i, name: e.name }));
+    const entries = await openZipImages(file_path);
+    return entries.map((e, i) => ({ index: i, name: path.basename(e.path) }));
   }
 
   if (file_type === 'pdf') {
@@ -128,57 +174,58 @@ async function getPageList(comic) {
   return [];
 }
 
-/**
- * Get a specific page image as buffer.
- */
+// ── Single page extraction ────────────────────────────────────────────────
+
 async function getPage(comic, pageNum) {
   const { file_path, file_type } = comic;
 
   if (file_type === 'folder') {
     const files = fs.readdirSync(file_path)
-      .filter(f => IMAGE_EXTENSIONS.includes(path.extname(f).toLowerCase()))
+      .filter(f => IMAGE_EXTS.has(path.extname(f).toLowerCase()))
       .sort();
-    if (pageNum >= files.length) throw new Error('Page out of range');
+    if (pageNum >= files.length) throw new Error(`Page ${pageNum} out of range (${files.length} pages)`);
     const imgPath = path.join(file_path, files[pageNum]);
     return { buffer: fs.readFileSync(imgPath), mimeType: mime.lookup(imgPath) || 'image/jpeg' };
   }
 
   if (file_type === 'cbz' || file_type === 'zip') {
-    const zip = new AdmZip(file_path);
-    const entries = zip.getEntries()
-      .filter(e => IMAGE_EXTENSIONS.includes(path.extname(e.name).toLowerCase()))
-      .sort((a, b) => a.entryName.localeCompare(b.entryName, undefined, { numeric: true }));
-    if (pageNum >= entries.length) throw new Error('Page out of range');
+    // Random-access: reads central directory then seeks to the specific entry.
+    // Only the compressed bytes for this one page are loaded into memory.
+    const entries = await openZipImages(file_path);
+    if (pageNum >= entries.length) throw new Error(`Page ${pageNum} out of range (${entries.length} pages)`);
     const entry = entries[pageNum];
-    const buffer = entry.getData();
-    return { buffer, mimeType: mime.lookup(entry.name) || 'image/jpeg' };
+    const buffer = await extractZipEntry(entry);
+    return { buffer, mimeType: mime.lookup(entry.path) || 'image/jpeg' };
   }
 
   if (file_type === 'pdf') {
-    // Render PDF page via pdf-poppler or use a fallback
-    // Using pdf-parse for text extraction; for images we use pdf2pic pattern
-    throw new Error('PDF rendering requires additional setup. Use pdf2pic or similar.');
+    throw new Error('PDF page rendering requires pdf2pic. Install it separately.');
   }
 
   throw new Error(`Unsupported file type: ${file_type}`);
 }
 
-/**
- * Get cover image (first page, resized).
- */
+// ── Cover (first page, resized) ───────────────────────────────────────────
+
 async function getCover(comic) {
-  // If we have a cached cover, return it
   if (comic.cover_path) {
     const absPath = path.resolve(__dirname, '../../data', comic.cover_path.replace(/^\//, ''));
     if (fs.existsSync(absPath)) {
       return { buffer: fs.readFileSync(absPath), mimeType: 'image/jpeg' };
     }
   }
-  // Generate on the fly
-  const { buffer, mimeType } = await getPage(comic, 0);
+  const { buffer } = await getPage(comic, 0);
   const img = await Jimp.read(buffer);
   const resized = await img.cover(300, 450).quality(85).getBufferAsync(Jimp.MIME_JPEG);
   return { buffer: resized, mimeType: 'image/jpeg' };
 }
 
-module.exports = { scanSource, getPageList, getPage, getCover, generateCoverAsync, countPagesPublic: countPages };
+module.exports = {
+  scanSource,
+  getPageList,
+  getPage,
+  getCover,
+  generateCoverAsync,
+  countPagesPublic: countPages,
+  updatePageCountAsync,
+};

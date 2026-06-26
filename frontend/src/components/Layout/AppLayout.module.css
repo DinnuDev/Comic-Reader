@@ -1,49 +1,181 @@
-.layout {
+/* Shell */
+.shell {
   height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #0a0a0a;
   overflow: hidden;
 }
 
-.sider {
-  background: #1a1a2e !important;
-  border-right: 1px solid #2a2a4a;
-  z-index: 100;
-}
-
-.logo {
-  height: 56px;
+/* ── TOP NAV ────────────────────────────────────── */
+.nav {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 200;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 0 16px;
-  border-bottom: 1px solid #2a2a4a;
-  overflow: hidden;
+  height: 60px;
+  padding: 0 40px 0 28px;
+  gap: 32px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.92) 0%, transparent 100%);
+  transition: background 0.4s ease;
+}
+
+.navSolid {
+  background: rgba(10,10,10,0.97) !important;
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  text-decoration: none;
 }
 
 .logoIcon {
   font-size: 22px;
-  color: #e94560;
-  flex-shrink: 0;
+  color: #e50914;
 }
 
 .logoText {
-  font-size: 16px;
-  font-weight: 700;
-  color: #eaeaea;
-  white-space: nowrap;
-  letter-spacing: 0.5px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #e50914;
+  letter-spacing: 2px;
 }
 
-.menu {
-  background: transparent !important;
-  border-right: none !important;
-  padding: 8px 0;
-}
-
-.content {
-  height: 100vh;
-  overflow: hidden;
-  background: #0d0d0d;
+/* Nav links */
+.navLinks {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  list-style: none;
+  margin: 0; padding: 0;
+  flex: 1;
+}
+
+.navLink {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.7);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.navLink:hover { color: #fff; background: rgba(255,255,255,0.08); }
+
+.navActive {
+  color: #fff !important;
+  font-weight: 600;
+}
+
+.navActive::after {
+  display: block;
+  content: '';
+  height: 2px;
+  background: #e50914;
+  border-radius: 1px;
+  margin-top: 2px;
+}
+
+/* Right actions */
+.navRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.iconBtn {
+  width: 36px; height: 36px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: rgba(255,255,255,0.75);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.iconBtn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+/* Search bar */
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 4px;
+  padding: 6px 12px;
+  animation: expandIn 0.2s ease;
+}
+
+@keyframes expandIn {
+  from { width: 36px; opacity: 0; }
+  to   { width: 240px; opacity: 1; }
+}
+
+.searchIcon { color: rgba(255,255,255,0.6); font-size: 14px; }
+
+.searchInput {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 14px;
+  width: 180px;
+}
+
+.searchInput::placeholder { color: rgba(255,255,255,0.4); }
+
+.searchClose {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.searchClose:hover { color: #fff; }
+
+/* ── CONTENT AREA ────────────────────────────────── */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Padded-top so content starts below the transparent nav */
+  padding-top: 60px;
+  background: #0a0a0a;
+}
+
+/* Custom scrollbar */
+.content::-webkit-scrollbar { width: 6px; }
+.content::-webkit-scrollbar-track { background: transparent; }
+.content::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+.content::-webkit-scrollbar-thumb:hover { background: #555; }
+
+@media (max-width: 680px) {
+  .nav { padding: 0 16px; gap: 16px; }
+  .navLinks { gap: 0; }
+  .navLink { font-size: 13px; padding: 6px 8px; }
+  .logoText { display: none; }
 }

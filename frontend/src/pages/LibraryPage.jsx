@@ -1,61 +1,71 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Input, Select, Button, Tabs, Empty, Spin, Typography,
-  Space, message, Tooltip, Dropdown, notification, Drawer,
+  Spin, notification, Drawer, Button, Typography,
 } from 'antd';
 import {
-  AppstoreOutlined, UnorderedListOutlined,
-  ReloadOutlined, BookOutlined, ScanOutlined, UploadOutlined,
-  ClockCircleOutlined, HeartOutlined, PlusCircleOutlined,
+  UploadOutlined, PlusCircleOutlined, ReloadOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { libraryApi, sourcesApi } from '../services/api';
 import ComicCard from '../components/Library/ComicCard';
-import ComicListItem from '../components/Library/ComicListItem';
+import HeroSection from '../components/Library/HeroSection';
+import ComicCarousel from '../components/Library/ComicCarousel';
+import { SkeletonCarousel } from '../components/Library/SkeletonCard';
 import DropZone from '../components/Upload/DropZone';
+import SearchResults from '../components/Library/SearchResults';
+import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import styles from './LibraryPage.module.css';
 
-const { Title, Text } = Typography;
-const { Search } = Input;
+const { Text } = Typography;
+
+/** Fade-in wrapper for the hero when it first mounts */
+function AnimatedHero({ children }) {
+  const [heroRef, heroVisible] = useScrollAnimation({ threshold: 0.01, rootMargin: '0px' });
+  return (
+    <div
+      ref={heroRef}
+      style={{
+        opacity: heroVisible ? 1 : 0,
+        transform: heroVisible ? 'translateY(0)' : 'translateY(12px)',
+        transition: 'opacity 0.6s ease, transform 0.6s ease',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default function LibraryPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const [viewMode, setViewMode] = useState('grid');
-  const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState('title');
-  const [activeTab, setActiveTab] = useState('all');
-  const [scanningSource, setScanningSource] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
-  const [notifApi, contextHolder] = notification.useNotification();
+  const [scanningId, setScanningId] = useState(null);
+  const [notifApi, ctxHolder] = notification.useNotification();
 
-  // Handle OAuth callback params (?gdrive=connected or ?gdrive=error)
+  // Pull search from URL (set by top-nav search)
+  const urlSearch = searchParams.get('search') || '';
+
+  // Google Drive OAuth callback
   useEffect(() => {
     const gdrive = searchParams.get('gdrive');
     const reason = searchParams.get('reason');
     if (gdrive === 'connected') {
-      notifApi.success({ message: 'Google Drive Connected', description: 'You can now add Google Drive folders as sources.' });
+      notifApi.success({ message: 'Google Drive Connected!' });
       setSearchParams({});
     } else if (gdrive === 'error') {
       const msg = reason === 'invalid_grant'
-        ? 'The authorization code expired or was already used. Please try connecting again.'
-        : reason
-          ? decodeURIComponent(reason)
-          : 'Google Drive connection failed.';
+        ? 'Auth code expired — please try again.'
+        : reason ? decodeURIComponent(reason) : 'Connection failed.';
       notifApi.error({ message: 'Google Drive Error', description: msg, duration: 8 });
       setSearchParams({});
     }
   }, [searchParams]);
 
-  const { data: libraryData, isLoading } = useQuery({
-    queryKey: ['library', search, sortBy, activeTab],
-    queryFn: () => libraryApi.getAll({
-      search: search || undefined,
-      sort: sortBy,
-      favorite: activeTab === 'favorites' ? 'true' : undefined,
-    }),
+  const { data: allData, isLoading } = useQuery({
+    queryKey: ['library', urlSearch],
+    queryFn: () => libraryApi.getAll({ search: urlSearch || undefined, sort: 'date_added', order: 'desc', limit: 200 }),
   });
 
   const { data: recentComics } = useQuery({
@@ -70,171 +80,196 @@ export default function LibraryPage() {
 
   const favMutation = useMutation({
     mutationFn: libraryApi.toggleFavorite,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['library'] }),
-  });
-
-  const handleScan = async (sourceId) => {
-    setScanningSource(sourceId);
-    try {
-      const result = await libraryApi.scanSource(sourceId);
-      message.success(result.message);
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['library'] });
       queryClient.invalidateQueries({ queryKey: ['recent'] });
-    } catch (err) {
-      message.error(`Scan failed: ${err.response?.data?.error || err.message}`);
-    } finally {
-      setScanningSource(null);
+    },
+  });
+
+  const handleScanAll = async () => {
+    const srcs = sources || [];
+    for (const s of srcs) {
+      setScanningId(s.id);
+      try {
+        await libraryApi.scanSource(s.id);
+      } catch {}
     }
+    setScanningId(null);
+    queryClient.invalidateQueries({ queryKey: ['library'] });
+    queryClient.invalidateQueries({ queryKey: ['recent'] });
   };
 
   const handleUploaded = useCallback((count) => {
-    message.success(`${count} comic${count > 1 ? 's' : ''} added to library!`);
+    notification.success({ message: `${count} comic${count > 1 ? 's' : ''} added!` });
     queryClient.invalidateQueries({ queryKey: ['library'] });
     queryClient.invalidateQueries({ queryKey: ['sources'] });
+    queryClient.invalidateQueries({ queryKey: ['recent'] });
+    setShowUpload(false);
   }, [queryClient]);
 
-  const comics = libraryData?.comics || [];
-  const displayComics = activeTab === 'recent' ? (recentComics || []) : comics;
-  const hasComics = (libraryData?.total || 0) > 0;
+  const comics = allData?.comics || [];
 
-  const scanItems = (sources || []).map(s => ({
-    key: s.id,
-    icon: <ScanOutlined />,
-    label: `Scan: ${s.name}`,
-    onClick: () => handleScan(s.id),
-  }));
+  // Derived lists for carousels
+  const continueReading = useMemo(() =>
+    (recentComics || []).filter(c => (c.current_page || 0) > 0 && c.current_page < c.total_pages - 1),
+    [recentComics]);
 
-  const tabItems = [
-    { key: 'all', label: <span><BookOutlined /> All ({libraryData?.total || 0})</span> },
-    { key: 'recent', label: <span><ClockCircleOutlined /> Recent</span> },
-    { key: 'favorites', label: <span><HeartOutlined /> Favorites</span> },
-  ];
+  const recentlyAdded = useMemo(() =>
+    [...comics].sort((a, b) => (b.date_added || 0) - (a.date_added || 0)).slice(0, 20),
+    [comics]);
+
+  const favorites = useMemo(() =>
+    comics.filter(c => c.is_favorite),
+    [comics]);
+
+  const series = useMemo(() => {
+    const map = {};
+    comics.forEach(c => {
+      if (c.series) {
+        if (!map[c.series]) map[c.series] = [];
+        map[c.series].push(c);
+      }
+    });
+    return Object.entries(map).sort((a, b) => b[1].length - a[1].length);
+  }, [comics]);
+
+  // Hero: use last-read or first comic
+  const heroComic = continueReading[0] || recentlyAdded[0] || null;
+
+  const cardProps = (comic) => ({
+    comic,
+    onRead: () => navigate(`/read/${comic.id}`),
+    onFavorite: () => favMutation.mutate(comic.id),
+  });
+
+  if (isLoading) {
+    return (
+      <div className={styles.page}>
+        {/* Skeleton hero */}
+        <div className={styles.skeletonHero} />
+        <div className={styles.toolbar} style={{ opacity: 0 }} />
+        <SkeletonCarousel title count={8} />
+        <SkeletonCarousel title count={8} />
+        <SkeletonCarousel title count={8} />
+      </div>
+    );
+  }
+
+  // Search results view
+  if (urlSearch) {
+    return (
+      <div className={styles.page}>
+        {ctxHolder}
+        <SearchResults
+          comics={comics}
+          query={urlSearch}
+          onRead={id => navigate(`/read/${id}`)}
+          onFavorite={id => favMutation.mutate(id)}
+          onClear={() => setSearchParams({})}
+        />
+      </div>
+    );
+  }
+
+  // Empty library
+  if (comics.length === 0) {
+    return (
+      <div className={styles.page}>
+        {ctxHolder}
+        <div className={styles.emptyScreen}>
+          <div className={styles.emptyInner}>
+            <div className={styles.emptyIcon}>📚</div>
+            <h2 className={styles.emptyTitle}>Your library is empty</h2>
+            <p className={styles.emptySubtitle}>Upload comics or add a source folder to get started.</p>
+            <div className={styles.emptyActions}>
+              <Button type="primary" size="large" icon={<UploadOutlined />} onClick={() => setShowUpload(true)}
+                style={{ background: '#e50914', borderColor: '#e50914' }}>
+                Upload Comics
+              </Button>
+              <Button size="large" icon={<PlusCircleOutlined />} onClick={() => navigate('/sources')}>
+                Add Source
+              </Button>
+            </div>
+            <div className={styles.emptyDropZone}>
+              <DropZone compact onUploaded={handleUploaded} />
+            </div>
+          </div>
+        </div>
+        <Drawer title="Upload Comics" placement="right" width={480} open={showUpload} onClose={() => setShowUpload(false)}>
+          <DropZone onUploaded={handleUploaded} />
+        </Drawer>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
-      {contextHolder}
+      {ctxHolder}
 
-      {/* Toolbar */}
+      {/* ── HERO ──────────────────────────────────── */}
+      {heroComic && (
+        <AnimatedHero>
+          <HeroSection
+            comic={heroComic}
+            onRead={() => navigate(`/read/${heroComic.id}`)}
+            onFavorite={() => favMutation.mutate(heroComic.id)}
+          />
+        </AnimatedHero>
+      )}
+
+      {/* ── FLOATING TOOLBAR ──────────────────────── */}
       <div className={styles.toolbar}>
-        <Title level={4} className={styles.pageTitle}>Library</Title>
-        <Space wrap>
-          <Search
-            placeholder="Search comics, series..."
-            allowClear
-            onSearch={v => setSearch(v)}
-            onChange={e => !e.target.value && setSearch('')}
-            className={styles.search}
-          />
-          <Select
-            value={sortBy}
-            onChange={setSortBy}
-            options={[
-              { value: 'title', label: 'Title' },
-              { value: 'date_added', label: 'Date Added' },
-              { value: 'last_read', label: 'Last Read' },
-              { value: 'series', label: 'Series' },
-            ]}
-            className={styles.sort}
-          />
-          <Tooltip title={viewMode === 'grid' ? 'List view' : 'Grid view'}>
-            <Button
-              icon={viewMode === 'grid' ? <UnorderedListOutlined /> : <AppstoreOutlined />}
-              onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')}
-            />
-          </Tooltip>
+        <Button icon={<UploadOutlined />} onClick={() => setShowUpload(true)}>Upload</Button>
+        {(sources || []).length > 0 && (
           <Button
-            icon={<UploadOutlined />}
-            onClick={() => setShowUpload(true)}
+            icon={<ReloadOutlined spin={!!scanningId} />}
+            loading={!!scanningId}
+            onClick={handleScanAll}
           >
-            Upload
+            Scan All
           </Button>
-          {scanItems.length > 0 && (
-            <Dropdown menu={{ items: scanItems }} disabled={!scanItems.length}>
-              <Button icon={<ReloadOutlined spin={!!scanningSource} />} loading={!!scanningSource}>
-                Scan
-              </Button>
-            </Dropdown>
-          )}
-        </Space>
-      </div>
-
-      {/* Compact drop zone always visible below toolbar */}
-      <div className={styles.compactUpload}>
-        <DropZone compact onUploaded={handleUploaded} />
-      </div>
-
-      {/* Tabs */}
-      <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
-        items={tabItems}
-        className={styles.tabs}
-      />
-
-      {/* Content */}
-      <div className={styles.content}>
-        {isLoading ? (
-          <div className={styles.loading}><Spin size="large" /></div>
-        ) : displayComics.length === 0 ? (
-          <Empty
-            image={<BookOutlined style={{ fontSize: 64, color: '#333' }} />}
-            description={
-              <div className={styles.emptyState}>
-                <Text strong style={{ fontSize: 16 }}>
-                  {search ? `No results for "${search}"` : 'Your library is empty'}
-                </Text>
-                <Text type="secondary">
-                  {search ? 'Try a different search term.' : 'Upload comics using the button above, or add a source folder.'}
-                </Text>
-                {!search && (
-                  <Space>
-                    <Button type="primary" icon={<UploadOutlined />} onClick={() => setShowUpload(true)}>
-                      Upload Comics
-                    </Button>
-                    <Button icon={<PlusCircleOutlined />} onClick={() => navigate('/sources')}>
-                      Add Source
-                    </Button>
-                  </Space>
-                )}
-              </div>
-            }
-            className={styles.empty}
-          />
-        ) : viewMode === 'grid' ? (
-          <div className={styles.grid}>
-            {displayComics.map(comic => (
-              <ComicCard
-                key={comic.id}
-                comic={comic}
-                onRead={() => navigate(`/read/${comic.id}`)}
-                onFavorite={() => favMutation.mutate(comic.id)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className={styles.list}>
-            {displayComics.map(comic => (
-              <ComicListItem
-                key={comic.id}
-                comic={comic}
-                onRead={() => navigate(`/read/${comic.id}`)}
-                onFavorite={() => favMutation.mutate(comic.id)}
-              />
-            ))}
-          </div>
         )}
+        <Button icon={<PlusCircleOutlined />} onClick={() => navigate('/sources')}>Sources</Button>
       </div>
 
-      {/* Full upload drawer */}
-      <Drawer
-        title="Upload Comics"
-        placement="right"
-        width={480}
-        open={showUpload}
-        onClose={() => setShowUpload(false)}
-        extra={<Text type="secondary" style={{ fontSize: 12 }}>CBZ · CBR · PDF · ZIP</Text>}
-      >
-        <DropZone onUploaded={(count) => { handleUploaded(count); }} />
+      {/* ── CAROUSELS ─────────────────────────────── */}
+      {continueReading.length > 0 && (
+        <ComicCarousel title="Continue Reading">
+          {continueReading.map(c => <ComicCard key={c.id} {...cardProps(c)} />)}
+        </ComicCarousel>
+      )}
+
+      {recentlyAdded.length > 0 && (
+        <ComicCarousel title="Recently Added">
+          {recentlyAdded.map(c => <ComicCard key={c.id} {...cardProps(c)} />)}
+        </ComicCarousel>
+      )}
+
+      {favorites.length > 0 && (
+        <ComicCarousel title="❤ Favorites">
+          {favorites.map(c => <ComicCard key={c.id} {...cardProps(c)} />)}
+        </ComicCarousel>
+      )}
+
+      {series.map(([seriesName, seriesComics]) => (
+        <ComicCarousel key={seriesName} title={seriesName}>
+          {seriesComics.map(c => <ComicCard key={c.id} {...cardProps(c)} />)}
+        </ComicCarousel>
+      ))}
+
+      {/* All comics if no series */}
+      {series.length === 0 && continueReading.length === 0 && (
+        <ComicCarousel title="All Comics">
+          {comics.map(c => <ComicCard key={c.id} {...cardProps(c)} />)}
+        </ComicCarousel>
+      )}
+
+      {/* Bottom padding */}
+      <div style={{ height: 48 }} />
+
+      {/* Upload drawer */}
+      <Drawer title="Upload Comics" placement="right" width={480} open={showUpload} onClose={() => setShowUpload(false)}>
+        <DropZone onUploaded={handleUploaded} />
       </Drawer>
     </div>
   );

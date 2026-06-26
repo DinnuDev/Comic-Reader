@@ -10,17 +10,23 @@ import SettingsPage from './pages/SettingsPage';
 const antdTheme = {
   algorithm: theme.darkAlgorithm,
   token: {
-    colorPrimary: '#e94560',
-    colorBgBase: '#0d0d0d',
-    colorBgContainer: '#16213e',
-    colorBgElevated: '#1a1a2e',
-    borderRadius: 8,
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    colorPrimary: '#e50914',
+    colorBgBase: '#0a0a0a',
+    colorBgContainer: '#141414',
+    colorBgElevated: '#181818',
+    colorText: '#e5e5e5',
+    colorTextSecondary: 'rgba(255,255,255,0.55)',
+    borderRadius: 4,
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
   },
   components: {
-    Layout: { bodyBg: '#0d0d0d', headerBg: '#1a1a2e', siderBg: '#1a1a2e' },
-    Menu: { darkItemBg: '#1a1a2e', darkSubMenuItemBg: '#16213e' },
-    Card: { colorBgContainer: '#16213e' },
+    Layout: { bodyBg: '#0a0a0a', headerBg: '#0a0a0a', siderBg: '#0a0a0a' },
+    Menu: { darkItemBg: 'transparent', darkSubMenuItemBg: 'transparent' },
+    Card: { colorBgContainer: '#141414' },
+    Drawer: { colorBgElevated: '#141414' },
+    Modal: { contentBg: '#181818', headerBg: '#181818' },
+    Button: { colorPrimary: '#e50914', colorPrimaryHover: '#f40612' },
+    Slider: { colorPrimaryBorder: '#e50914', colorPrimary: '#e50914' },
   },
 };
 
