@@ -1,0 +1,261 @@
+/* Full-screen reader shell */
+.reader {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── RESUME BANNER ────────────────────────────────── */
+.resumeBanner {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 65;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0,0,0,0.78);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.9);
+  font-size: 13px;
+  padding: 7px 14px;
+  border-radius: 20px;
+  white-space: nowrap;
+  animation: fadeInDown 0.3s ease;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.resumeDismiss {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 12px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.resumeDismiss:hover { color: #fff; }
+
+/* ── TOP BAR ──────────────────────────────────────── */
+.topBar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px 20px;
+  background: linear-gradient(to bottom,
+    rgba(0,0,0,0.82) 0%,
+    rgba(0,0,0,0.5)  60%,
+    transparent      100%);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.topBar.hidden  { opacity: 0; transform: translateY(-100%); pointer-events: none; }
+.topBar.visible { opacity: 1; transform: translateY(0); }
+
+.titleArea {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.titleText {
+  color: #fff !important;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.subtitle {
+  color: rgba(255,255,255,0.55) !important;
+  font-size: 11px;
+}
+
+.topActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ── ICON BUTTONS ─────────────────────────────────── */
+.iconBtn {
+  width: 40px; height: 40px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  color: rgba(255,255,255,0.85);
+  font-size: 17px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+  padding: 0;
+}
+.iconBtn:hover { background: rgba(255,255,255,0.14); color: #fff; }
+.iconBtn.bookmarked { color: #fbbf24; }
+.iconBtn.bookmarked:hover { background: rgba(251,191,36,0.15); }
+
+/* ── BOTTOM BAR ───────────────────────────────────── */
+.bottomBar {
+  position: absolute;
+  bottom: 4px; left: 0; right: 0;
+  z-index: 60;
+  padding: 0 0 6px;
+  background: linear-gradient(to top,
+    rgba(0,0,0,0.85) 0%,
+    rgba(0,0,0,0.6)  60%,
+    transparent      100%);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.bottomBar.hidden  { opacity: 0; transform: translateY(100%); pointer-events: none; }
+.bottomBar.visible { opacity: 1; transform: translateY(0); }
+
+.bottomInner {
+  padding: 8px 16px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.navRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navBtn {
+  width: 40px; height: 40px;
+  background: rgba(255,255,255,0.08);
+  border: none;
+  border-radius: 50%;
+  color: rgba(255,255,255,0.75);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.navBtn:hover:not(:disabled) { background: rgba(255,255,255,0.18); color: #fff; }
+.navBtn:disabled { opacity: 0.25; cursor: default; }
+
+.sliderWrap {
+  flex: 1;
+  padding: 0 4px;
+}
+
+/* Slider theme */
+.slider { margin: 0 !important; }
+.slider :global(.ant-slider-rail) { background: rgba(255,255,255,0.2) !important; height: 3px; }
+.slider :global(.ant-slider-track) { background: #e94560 !important; height: 3px; }
+.slider :global(.ant-slider-handle::after) {
+  box-shadow: 0 0 0 2px #e94560 !important;
+  width: 14px !important;
+  height: 14px !important;
+  inset-block-start: -5px !important;
+}
+.slider :global(.ant-slider-tooltip .ant-tooltip-inner) {
+  font-size: 12px;
+  padding: 3px 8px;
+  min-height: 24px;
+}
+
+.pageCounter {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: center;
+  padding: 2px 0 0;
+  letter-spacing: 0.3px;
+  transition: color 0.15s;
+  width: 100%;
+  line-height: 1.6;
+}
+.pageCounter:hover { color: rgba(255,255,255,0.85); text-decoration: underline; }
+
+/* ── ALWAYS-VISIBLE PROGRESS RAIL ────────────────── */
+.progressRail {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.12);
+  z-index: 70;
+}
+
+.progressFill {
+  height: 100%;
+  background: #e94560;
+  transition: width 0.3s ease;
+  min-width: 3px;
+}
+
+.bookmarkTick {
+  position: absolute;
+  top: -1px;
+  width: 3px;
+  height: 5px;
+  background: #fbbf24;
+  border-radius: 1px;
+  transform: translateX(-50%);
+}
+
+/* ── FLOATING PAGE NUMBER (when UI hidden) ────────── */
+.floatingPageNum {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  padding: 3px 10px;
+  border-radius: 12px;
+  transition: color 0.2s, background 0.2s;
+  z-index: 55;
+  white-space: nowrap;
+}
+.floatingPageNum:hover {
+  color: rgba(255,255,255,0.9);
+  background: rgba(0,0,0,0.5);
+}
+
+/* ── THUMBNAIL DRAWER ─────────────────────────────── */
+.thumbDrawer :global(.ant-drawer-content) {
+  background: #1a1a2e;
+  border-top: 1px solid #2a2a4a;
+}
+.thumbDrawer :global(.ant-drawer-header) {
+  background: #1a1a2e;
+  border-bottom: 1px solid #2a2a4a;
+  padding: 12px 16px;
+}
+.thumbDrawer :global(.ant-drawer-title) { color: #eaeaea; }
+.thumbDrawer :global(.ant-drawer-body) {
+  padding: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+@media (max-width: 480px) {
+  .topBar { padding: 8px 10px 16px; }
+  .iconBtn { width: 36px; height: 36px; font-size: 15px; }
+  .bottomBar { padding: 0; }
+}

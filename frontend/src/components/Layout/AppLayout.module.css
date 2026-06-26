@@ -1,0 +1,49 @@
+.layout {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sider {
+  background: #1a1a2e !important;
+  border-right: 1px solid #2a2a4a;
+  z-index: 100;
+}
+
+.logo {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid #2a2a4a;
+  overflow: hidden;
+}
+
+.logoIcon {
+  font-size: 22px;
+  color: #e94560;
+  flex-shrink: 0;
+}
+
+.logoText {
+  font-size: 16px;
+  font-weight: 700;
+  color: #eaeaea;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+}
+
+.menu {
+  background: transparent !important;
+  border-right: none !important;
+  padding: 8px 0;
+}
+
+.content {
+  height: 100vh;
+  overflow: hidden;
+  background: #0d0d0d;
+  display: flex;
+  flex-direction: column;
+}
