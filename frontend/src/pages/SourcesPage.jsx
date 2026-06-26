@@ -52,11 +52,27 @@ export default function SourcesPage() {
 
   const addMutation = useMutation({
     mutationFn: sourcesApi.create,
-    onSuccess: () => {
+    onSuccess: async (newSource) => {
       queryClient.invalidateQueries({ queryKey: ['sources'] });
-      message.success('Source added!');
+      message.success('Source added! Scanning for comics…');
       setAddModal(false);
       form.resetFields();
+      setSourceType('local');
+
+      // Auto-scan the newly added source immediately
+      if (newSource?.id) {
+        setScanning(newSource.id);
+        try {
+          const result = await libraryApi.scanSource(newSource.id);
+          message.success(result.message || 'Scan complete');
+          queryClient.invalidateQueries({ queryKey: ['library'] });
+          queryClient.invalidateQueries({ queryKey: ['recent'] });
+        } catch (err) {
+          message.error(`Scan failed: ${err.response?.data?.error || err.message}`);
+        } finally {
+          setScanning(null);
+        }
+      }
     },
     onError: (err) => message.error(err.response?.data?.error || 'Failed to add source'),
   });

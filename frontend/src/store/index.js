@@ -1,9 +1,32 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+// ── Upload queue (NOT persisted — resets on page reload) ──────────────────
+// Tracks files being uploaded or indexed, so ghost cards appear in the
+// library the instant an upload starts rather than after it finishes.
+const uploadQueueSlice = (set) => ({
+  uploadQueue: [],
+  // { localId, title, size, status: 'uploading'|'indexing'|'done', percent, comicId }
+
+  queueAddUpload: (item) =>
+    set(s => ({ uploadQueue: [...s.uploadQueue, item] })),
+
+  queueUpdateUpload: (localId, patch) =>
+    set(s => ({
+      uploadQueue: s.uploadQueue.map(i => i.localId === localId ? { ...i, ...patch } : i),
+    })),
+
+  queueRemoveUpload: (localId) =>
+    set(s => ({ uploadQueue: s.uploadQueue.filter(i => i.localId !== localId) })),
+
+  queueClear: () => set({ uploadQueue: [] }),
+});
+
 export const useAppStore = create(
   persist(
     (set, get) => ({
+      // ── Upload queue (not persisted) ──────────────────
+      ...uploadQueueSlice(set),
       // Reading settings
       settings: {
         readingDirection: 'ltr', // ltr | rtl

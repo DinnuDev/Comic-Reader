@@ -108,7 +108,19 @@ router.post('/scan/:sourceId', async (req, res) => {
 
   try {
     const added = await comicService.scanSource(source);
-    res.json({ added, message: `Scanned source. Added/updated ${added} comics.` });
+    // After scan, return list of newly processing comics so the frontend
+    // can display ghost cards immediately without a separate library fetch.
+    const processingComics = db.prepare(`
+      SELECT id, title, file_type, file_size, page_count
+      FROM comics WHERE source_id = ? AND page_count = 0
+      ORDER BY date_added DESC
+    `).all(source.id);
+
+    res.json({
+      added,
+      message: `Scanned "${source.name}" — added ${added} comic${added !== 1 ? 's' : ''}.`,
+      processing: processingComics,
+    });
   } catch (err) {
     console.error('Scan error:', err);
     res.status(500).json({ error: err.message });

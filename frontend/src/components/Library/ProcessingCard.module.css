@@ -1,0 +1,90 @@
+/* ── Ghost card ─────────────────────────────────── */
+.card {
+  flex-shrink: 0;
+  width: 160px;      /* matches ComicCard md */
+  cursor: default;
+  border-radius: 4px;
+  overflow: visible;
+  scroll-snap-align: start;
+}
+
+/* Cover — same 2:3 aspect ratio */
+.cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #141414;
+}
+
+/* Shimmer animation */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+.shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    #1a1a1a 25%,
+    #252525 50%,
+    #1a1a1a 75%
+  );
+  background-size: 400px 100%;
+  animation: shimmer 1.6s ease infinite;
+}
+
+/* Overlay — centred on top of shimmer */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.35);
+}
+
+/* SVG ring */
+.ring {
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.6));
+}
+
+/* Indexing state */
+.indexingIcon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.indexingLabel {
+  font-size: 11px;
+  color: rgba(255,255,255,0.65);
+  letter-spacing: 0.4px;
+}
+
+/* Meta section below cover */
+.meta {
+  padding: 8px 4px 4px;
+}
+
+.title {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.status {
+  font-size: 10px;
+  color: rgba(255,255,255,0.3);
+  margin-top: 3px;
+}
