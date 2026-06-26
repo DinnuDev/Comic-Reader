@@ -55,6 +55,12 @@ export const progressApi = {
   deleteBookmark: (comicId, bookmarkId) => api.delete(`/progress/${comicId}/bookmarks/${bookmarkId}`).then(r => r.data),
 };
 
+// Setup — save credentials without editing .env manually
+export const setupApi = {
+  saveGoogleClientId: (clientId) => api.post('/setup/google-client', { clientId }).then(r => r.data),
+  getStatus: () => api.get('/setup/status').then(r => r.data),
+};
+
 // Google Drive
 export const gdriveApi = {
   getConfigStatus: () => api.get('/gdrive/config-status').then(r => r.data),

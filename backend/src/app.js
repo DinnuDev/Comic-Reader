@@ -16,6 +16,7 @@ const sourcesRoutes = require('./routes/sources');
 const gdriveRoutes = require('./routes/gdrive');
 const progressRoutes = require('./routes/progress');
 const uploadRoutes = require('./routes/upload');
+const setupRoutes = require('./routes/setup');
 
 const app = express();
 
@@ -76,6 +77,7 @@ app.use('/api/sources', sourcesRoutes);
 app.use('/api/gdrive', gdriveRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/setup', setupRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));

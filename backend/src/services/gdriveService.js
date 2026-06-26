@@ -1,14 +1,17 @@
 'use strict';
 /**
- * gdriveService.js
+ * gdriveService.js — PKCE OAuth2 (no client secret required)
  *
- * Google Drive OAuth2 service with DB-persisted token storage.
- * Tokens survive server restarts and are auto-refreshed on expiry.
+ * Uses the PKCE (Proof Key for Code Exchange) extension so users only need
+ * to supply a GOOGLE_CLIENT_ID (Desktop-app type). The client_secret field
+ * is intentionally omitted — Google accepts PKCE-only token exchange for
+ * public / installed-application OAuth clients.
  */
 
-const { google } = require('googleapis');
-const path = require('path');
-const db = require('../db/database');
+const crypto = require('crypto');
+const https  = require('https');
+const path   = require('path');
+const db     = require('../db/database');
 const { v4: uuidv4 } = require('uuid');
 
 const IMAGE_EXTENSIONS = new Set(['.jpg','.jpeg','.png','.gif','.webp','.avif','.bmp']);
@@ -19,57 +22,100 @@ const COMIC_MIME_TYPES = new Set([
   'application/x-zip-compressed','application/octet-stream',
 ]);
 
-// ── Credentials check ─────────────────────────────────────────────────────
+// ── Configuration check ───────────────────────────────────────────────────
+
+function clientId() { return process.env.GOOGLE_CLIENT_ID || ''; }
 
 function isConfigured() {
-  const id     = process.env.GOOGLE_CLIENT_ID     || '';
-  const secret = process.env.GOOGLE_CLIENT_SECRET || '';
-  return id.length > 10     && !id.startsWith('your-') &&
-         secret.length > 5  && !secret.startsWith('your-');
+  const id = clientId();
+  return id.length > 10 && id.includes('.apps.googleusercontent.com');
 }
 
-// ── OAuth2 client factory ─────────────────────────────────────────────────
-
-function createOAuth2Client() {
-  if (!isConfigured()) {
-    throw new Error(
-      'Google Drive credentials not configured. ' +
-      'Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in backend/.env'
-    );
-  }
-  return new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3001/api/gdrive/callback'
-  );
+function getRedirectUri() {
+  return process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3001/api/gdrive/callback';
 }
 
-function getAuthUrl(state = '') {
-  const client = createOAuth2Client();
-  return client.generateAuthUrl({
-    access_type: 'offline',
-    prompt: 'consent',
-    state,
-    scope: [
+// ── PKCE helpers ──────────────────────────────────────────────────────────
+
+function generateCodeVerifier() {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+function generateCodeChallenge(verifier) {
+  return crypto.createHash('sha256').update(verifier).digest('base64url');
+}
+
+function generateState() {
+  return crypto.randomBytes(16).toString('base64url');
+}
+
+// ── Auth URL ──────────────────────────────────────────────────────────────
+
+function getAuthUrl(codeChallenge, state = '') {
+  if (!isConfigured()) throw new Error('Google Client ID not configured');
+  const params = new URLSearchParams({
+    client_id:             clientId(),
+    redirect_uri:          getRedirectUri(),
+    response_type:         'code',
+    scope:                 [
       'https://www.googleapis.com/auth/drive.readonly',
       'https://www.googleapis.com/auth/userinfo.email',
       'https://www.googleapis.com/auth/userinfo.profile',
-    ],
+    ].join(' '),
+    access_type:           'offline',
+    prompt:                'consent',
+    state,
+    code_challenge:        codeChallenge,
+    code_challenge_method: 'S256',
   });
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
 }
 
-// ── Token exchange + persistence ──────────────────────────────────────────
+// ── Token exchange (PKCE — no client secret) ──────────────────────────────
 
-async function exchangeCode(code) {
-  const client = createOAuth2Client();
-  const { tokens } = await client.getToken(code);
-  if (!tokens.access_token) throw new Error('No access token returned by Google');
-  return tokens;
+async function exchangeCode(code, codeVerifier) {
+  const body = new URLSearchParams({
+    client_id:    clientId(),
+    code,
+    code_verifier: codeVerifier,
+    grant_type:   'authorization_code',
+    redirect_uri: getRedirectUri(),
+  });
+
+  const data = await postJSON('https://oauth2.googleapis.com/token', body.toString(),
+    { 'Content-Type': 'application/x-www-form-urlencoded' });
+
+  if (data.error) throw new Error(data.error_description || data.error);
+  if (!data.access_token) throw new Error('No access token in response');
+
+  // Normalise expiry to an absolute timestamp (ms) like googleapis does
+  if (data.expires_in && !data.expiry_date) {
+    data.expiry_date = Date.now() + data.expires_in * 1000;
+  }
+  return data;
 }
 
-/** Save tokens + user info to DB. Returns the account row. */
+// ── Token refresh ─────────────────────────────────────────────────────────
+
+async function refreshAccessToken(refreshToken) {
+  const body = new URLSearchParams({
+    client_id:     clientId(),
+    refresh_token: refreshToken,
+    grant_type:    'refresh_token',
+  });
+
+  const data = await postJSON('https://oauth2.googleapis.com/token', body.toString(),
+    { 'Content-Type': 'application/x-www-form-urlencoded' });
+
+  if (data.error) throw new Error(data.error_description || data.error);
+  if (data.expires_in) data.expiry_date = Date.now() + data.expires_in * 1000;
+  return data;
+}
+
+// ── Account persistence ───────────────────────────────────────────────────
+
 async function saveAccount(tokens) {
-  const userInfo = await getUserInfoRaw(tokens);
+  const userInfo = await getUserInfo(tokens.access_token);
   const existing = db.prepare('SELECT id FROM gdrive_accounts WHERE email = ?').get(userInfo.email);
   const id = existing?.id ?? uuidv4();
 
@@ -77,125 +123,99 @@ async function saveAccount(tokens) {
     INSERT INTO gdrive_accounts (id, email, name, picture, access_token, refresh_token, expiry_date, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, unixepoch())
     ON CONFLICT(email) DO UPDATE SET
-      name = excluded.name,
-      picture = excluded.picture,
-      access_token = excluded.access_token,
+      name          = excluded.name,
+      picture       = excluded.picture,
+      access_token  = excluded.access_token,
       refresh_token = COALESCE(excluded.refresh_token, gdrive_accounts.refresh_token),
-      expiry_date = excluded.expiry_date,
-      updated_at = unixepoch()
-  `).run(
-    id, userInfo.email, userInfo.name, userInfo.picture,
-    tokens.access_token,
-    tokens.refresh_token ?? null,
-    tokens.expiry_date ?? null
-  );
+      expiry_date   = excluded.expiry_date,
+      updated_at    = unixepoch()
+  `).run(id, userInfo.email, userInfo.name, userInfo.picture,
+    tokens.access_token, tokens.refresh_token ?? null, tokens.expiry_date ?? null);
 
   return db.prepare('SELECT * FROM gdrive_accounts WHERE id = ?').get(id);
 }
 
-/** Load account from DB by id. Returns null if not found. */
-function loadAccount(accountId) {
-  return db.prepare('SELECT * FROM gdrive_accounts WHERE id = ?').get(accountId) ?? null;
+function loadAccount(id) {
+  return db.prepare('SELECT * FROM gdrive_accounts WHERE id = ?').get(id) ?? null;
 }
 
-/** List all connected accounts. */
 function listAccounts() {
   return db.prepare('SELECT id, email, name, picture, updated_at FROM gdrive_accounts ORDER BY updated_at DESC').all();
 }
 
-/** Remove an account. */
-function removeAccount(accountId) {
-  db.prepare('DELETE FROM gdrive_accounts WHERE id = ?').run(accountId);
+function removeAccount(id) {
+  db.prepare('DELETE FROM gdrive_accounts WHERE id = ?').run(id);
 }
 
-// ── Drive client with auto-refresh ───────────────────────────────────────
+// ── Fresh access token (auto-refresh) ────────────────────────────────────
 
-function getDriveClient(account) {
-  const auth = createOAuth2Client();
-  auth.setCredentials({
-    access_token:  account.access_token,
-    refresh_token: account.refresh_token,
-    expiry_date:   account.expiry_date,
-  });
+async function getValidToken(account) {
+  const EXPIRY_BUFFER = 5 * 60 * 1000; // refresh 5 min before expiry
+  if (account.expiry_date && Date.now() + EXPIRY_BUFFER < account.expiry_date) {
+    return account.access_token; // still valid
+  }
+  if (!account.refresh_token) throw new Error('No refresh token — please reconnect Google Drive');
 
-  // Persist refreshed tokens back to DB
-  auth.on('tokens', (newTokens) => {
-    db.prepare(`
-      UPDATE gdrive_accounts
-      SET access_token = ?,
-          refresh_token = COALESCE(?, refresh_token),
-          expiry_date = ?,
-          updated_at = unixepoch()
-      WHERE id = ?
-    `).run(
-      newTokens.access_token,
-      newTokens.refresh_token ?? null,
-      newTokens.expiry_date ?? null,
-      account.id
-    );
-  });
+  const refreshed = await refreshAccessToken(account.refresh_token);
+  db.prepare(`
+    UPDATE gdrive_accounts
+    SET access_token = ?, expiry_date = ?, updated_at = unixepoch()
+    WHERE id = ?
+  `).run(refreshed.access_token, refreshed.expiry_date ?? null, account.id);
 
-  return google.drive({ version: 'v3', auth });
+  return refreshed.access_token;
 }
 
 // ── User info ─────────────────────────────────────────────────────────────
 
-async function getUserInfoRaw(tokens) {
-  const auth = createOAuth2Client();
-  auth.setCredentials(tokens);
-  const oauth2 = google.oauth2({ version: 'v2', auth });
-  const res = await oauth2.userinfo.get();
-  return res.data; // { email, name, picture, ... }
+async function getUserInfo(accessToken) {
+  const data = await getJSON(
+    'https://www.googleapis.com/oauth2/v2/userinfo',
+    accessToken
+  );
+  return data; // { email, name, picture, ... }
 }
 
 async function getAbout(account) {
-  const drive = getDriveClient(account);
-  const res = await drive.about.get({
-    fields: 'user(displayName,emailAddress,photoLink),storageQuota',
-  });
-  return res.data;
+  const token = await getValidToken(account);
+  const data = await getJSON(
+    'https://www.googleapis.com/drive/v3/about?fields=user(displayName,emailAddress,photoLink),storageQuota',
+    token
+  );
+  return data;
 }
 
-// ── Folder & file listing ─────────────────────────────────────────────────
-
-async function listFolders(account, parentId = 'root') {
-  const drive = getDriveClient(account);
-  const res = await drive.files.list({
-    q: `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
-    fields: 'files(id, name, mimeType)',
-    orderBy: 'name',
-    pageSize: 200,
-  });
-  return res.data.files || [];
-}
+// ── Drive listing ─────────────────────────────────────────────────────────
 
 async function listFolderContents(account, folderId = 'root') {
-  const drive = getDriveClient(account);
-  // Get folders and comic files in one request
-  const res = await drive.files.list({
-    q: `'${folderId}' in parents and trashed = false`,
-    fields: 'files(id, name, mimeType, size, thumbnailLink, iconLink)',
-    orderBy: 'folder,name',
-    pageSize: 300,
-  });
-
-  const all = res.data.files || [];
-  const folders = all.filter(f => f.mimeType === 'application/vnd.google-apps.folder');
-  const comics  = all.filter(f =>
-    COMIC_MIME_TYPES.has(f.mimeType) ||
-    COMIC_EXTS.some(ext => f.name.toLowerCase().endsWith(ext))
+  const token = await getValidToken(account);
+  const q = encodeURIComponent(`'${folderId}' in parents and trashed = false`);
+  const fields = encodeURIComponent('files(id,name,mimeType,size,iconLink)');
+  const data = await getJSON(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&orderBy=folder,name&pageSize=300`,
+    token
   );
 
+  const all = data.files || [];
+  const FOLDER_TYPE = 'application/vnd.google-apps.folder';
+  const folders = all.filter(f => f.mimeType === FOLDER_TYPE);
+  const comics  = all.filter(f =>
+    f.mimeType !== FOLDER_TYPE && (
+      COMIC_MIME_TYPES.has(f.mimeType) ||
+      COMIC_EXTS.some(ext => f.name.toLowerCase().endsWith(ext))
+    )
+  );
   return { folders, comics };
 }
 
+async function listFolders(account, parentId = 'root') {
+  const { folders } = await listFolderContents(account, parentId);
+  return folders;
+}
+
 async function getFolderInfo(account, folderId) {
-  const drive = getDriveClient(account);
-  const res = await drive.files.get({
-    fileId: folderId,
-    fields: 'id,name,parents',
-  });
-  return res.data;
+  const token = await getValidToken(account);
+  return getJSON(`https://www.googleapis.com/drive/v3/files/${folderId}?fields=id,name,parents`, token);
 }
 
 async function listComicFiles(account, folderId = 'root') {
@@ -206,12 +226,20 @@ async function listComicFiles(account, folderId = 'root') {
 // ── Page streaming ────────────────────────────────────────────────────────
 
 async function downloadFileBuffer(account, fileId) {
-  const drive = getDriveClient(account);
-  const res = await drive.files.get(
-    { fileId, alt: 'media' },
-    { responseType: 'arraybuffer' }
-  );
-  return Buffer.from(res.data);
+  const token = await getValidToken(account);
+  return new Promise((resolve, reject) => {
+    const req = https.get(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers: { Authorization: `Bearer ${token}` } },
+      (res) => {
+        const chunks = [];
+        res.on('data', c => chunks.push(c));
+        res.on('end', () => resolve(Buffer.concat(chunks)));
+        res.on('error', reject);
+      }
+    );
+    req.on('error', reject);
+  });
 }
 
 async function getPage(account, fileId, pageNum) {
@@ -223,24 +251,63 @@ async function getPage(account, fileId, pageNum) {
     .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
   if (pageNum >= entries.length) throw new Error('Page out of range');
   const chunks = [];
-  const stream = entries[pageNum].stream();
-  for await (const chunk of stream) chunks.push(chunk);
+  for await (const chunk of entries[pageNum].stream()) chunks.push(chunk);
   return { buffer: Buffer.concat(chunks), mimeType: 'image/jpeg' };
+}
+
+// ── HTTP helpers ──────────────────────────────────────────────────────────
+
+function getJSON(url, accessToken) {
+  return new Promise((resolve, reject) => {
+    const opts = new URL(url);
+    const req = https.get({
+      hostname: opts.hostname,
+      path:     opts.pathname + opts.search,
+      headers:  { Authorization: `Bearer ${accessToken}` },
+    }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+        catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+  });
+}
+
+function postJSON(url, body, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const opts = new URL(url);
+    const req = https.request({
+      method:   'POST',
+      hostname: opts.hostname,
+      path:     opts.pathname,
+      headers:  { ...headers, 'Content-Length': Buffer.byteLength(body) },
+    }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+        catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
 }
 
 module.exports = {
   isConfigured,
+  generateCodeVerifier,
+  generateCodeChallenge,
+  generateState,
   getAuthUrl,
   exchangeCode,
-  saveAccount,
-  loadAccount,
-  listAccounts,
-  removeAccount,
-  getUserInfoRaw,
-  getAbout,
-  listFolders,
-  listFolderContents,
-  getFolderInfo,
-  listComicFiles,
+  saveAccount, loadAccount, listAccounts, removeAccount,
+  getValidToken,
+  getUserInfo, getAbout,
+  listFolders, listFolderContents, getFolderInfo, listComicFiles,
   getPage,
 };

@@ -1,22 +1,74 @@
 .section { display: flex; flex-direction: column; gap: 12px; }
 
-.envCode {
+/* ── Setup wizard ────────────────────────────────── */
+.wizard {
+  padding: 4px 0;
+}
+
+.wizardHeader {
+  margin-bottom: 20px;
+}
+
+.wizardTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e5e5e5;
+}
+
+.wizardSub {
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  margin-top: 3px;
+}
+
+.steps :global(.ant-steps-item-title) { color: rgba(255,255,255,0.75) !important; font-size: 14px; }
+.steps :global(.ant-steps-item-description) { padding-bottom: 12px; }
+
+.stepTitle { font-weight: 600; }
+
+.stepBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 4px;
+}
+
+.stepText { color: rgba(255,255,255,0.55) !important; font-size: 13px; margin: 0 !important; }
+
+.redirectCode {
   background: #0a0a0a;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
   border-radius: 4px;
-  padding: 10px 14px;
+  padding: 3px 8px;
   font-size: 12px;
   color: #4a9eff;
-  margin: 8px 0 0;
-  overflow-x: auto;
   font-family: 'Courier New', monospace;
 }
 
-/* Account card */
+.pasteRow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.pasteRow :global(.ant-input) { flex: 1; }
+
+.noSecretNote {
+  font-size: 12px !important;
+  color: rgba(255,255,255,0.35) !important;
+}
+
+.wizardNav {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* ── Account card ─────────────────────────────────── */
 .accountCard {
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 14px 16px;
   transition: border-color 0.2s;
 }
@@ -29,10 +81,7 @@
   gap: 14px;
 }
 
-.accountInfo {
-  flex: 1;
-  min-width: 0;
-}
+.accountInfo { flex: 1; min-width: 0; }
 
 .accountEmail {
   font-size: 14px;
@@ -45,26 +94,31 @@
 
 .accountName {
   font-size: 12px;
-  color: rgba(255,255,255,0.5);
-  margin-top: 1px;
+  color: rgba(255,255,255,0.45);
+  margin-top: 2px;
 }
 
-.accountActions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
+.accountActions { display: flex; gap: 8px; flex-shrink: 0; }
 
-/* Quota bar */
 .quota {
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid rgba(255,255,255,0.06);
+  padding-left: 60px;
 }
 
 .quotaText {
-  font-size: 11px;
-  color: rgba(255,255,255,0.35) !important;
+  font-size: 11px !important;
+  color: rgba(255,255,255,0.3) !important;
   margin-top: 4px;
   display: block;
+}
+
+/* ── Connect row ─────────────────────────────────── */
+.connectRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 4px;
 }

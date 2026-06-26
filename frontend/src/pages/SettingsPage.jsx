@@ -1,294 +1,277 @@
 import React, { useState } from 'react';
-import { Switch, Select, Typography, Tag } from 'antd';
+import { Switch, Select, Typography, Tag, Divider } from 'antd';
 import {
-  ReadOutlined, SwapOutlined, BorderOutlined, BgColorsOutlined,
-  ThunderboltOutlined, EyeOutlined, KeyOutlined,
-  GithubOutlined, BookOutlined, InfoCircleOutlined,
+  ReadOutlined, BgColorsOutlined, KeyOutlined,
+  InfoCircleOutlined, SettingOutlined,
 } from '@ant-design/icons';
 import { useAppStore } from '../store';
-import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import styles from './SettingsPage.module.css';
 
 const { Text } = Typography;
 
-// Animated section wrapper
-function Section({ children, delay = 0 }) {
-  const [ref, visible] = useScrollAnimation({ threshold: 0.04 });
+// ── Setting row ───────────────────────────────────────────────────────────
+function Row({ label, hint, children, fullWidth }) {
   return (
-    <section ref={ref} className={`${styles.section} ${visible ? styles.visible : styles.hidden}`}
-      style={{ transitionDelay: `${delay}ms` }}>
-      {children}
-    </section>
-  );
-}
-
-// Individual setting row
-function SettingRow({ label, description, children }) {
-  return (
-    <div className={styles.row}>
-      <div className={styles.rowLabel}>
-        <div className={styles.rowTitle}>{label}</div>
-        {description && <div className={styles.rowDesc}>{description}</div>}
+    <div className={`${styles.row} ${fullWidth ? styles.rowFull : ''}`}>
+      <div className={styles.rowLeft}>
+        <div className={styles.rowLabel}>{label}</div>
+        {hint && <div className={styles.rowHint}>{hint}</div>}
       </div>
       <div className={styles.rowControl}>{children}</div>
     </div>
   );
 }
 
-// Section header
-function SectionHead({ icon, title, subtitle }) {
-  return (
-    <div className={styles.sectionHead}>
-      <span className={styles.sectionIcon}>{icon}</span>
-      <div>
-        <div className={styles.sectionTitle}>{title}</div>
-        {subtitle && <div className={styles.sectionSub}>{subtitle}</div>}
-      </div>
-    </div>
-  );
-}
-
-// ── Background colour swatches ─────────────────────────────────────────────
-const BG_OPTIONS = [
-  { value: '#000000', label: 'Black',    border: '#333' },
-  { value: '#1a1a1a', label: 'Dark',     border: '#444' },
-  { value: '#ffffff', label: 'White',    border: '#ccc' },
-  { value: '#f5f0e8', label: 'Sepia',    border: '#c8b89a' },
-];
-
-function ColorSwatch({ value, selected, onChange }) {
-  const opt = BG_OPTIONS.find(o => o.value === value);
-  return (
-    <button
-      className={`${styles.swatch} ${selected ? styles.swatchSelected : ''}`}
-      style={{ background: value, borderColor: selected ? '#e50914' : opt?.border }}
-      onClick={() => onChange(value)}
-      aria-label={opt?.label}
-      title={opt?.label}
-    />
-  );
-}
-
-// ── Reading direction selector ─────────────────────────────────────────────
-function DirectionPicker({ value, onChange }) {
+// ── Direction picker ──────────────────────────────────────────────────────
+function DirPicker({ value, onChange }) {
   return (
     <div className={styles.dirPicker}>
       {[
-        { v: 'ltr', label: 'Left → Right', icon: '→' },
-        { v: 'rtl', label: 'Right → Left', icon: '←', sub: 'Manga' },
-      ].map(opt => (
-        <button
-          key={opt.v}
-          className={`${styles.dirBtn} ${value === opt.v ? styles.dirBtnActive : ''}`}
-          onClick={() => onChange(opt.v)}
-        >
-          <span className={styles.dirArrow}>{opt.icon}</span>
-          <span className={styles.dirLabel}>{opt.label}</span>
-          {opt.sub && <span className={styles.dirSub}>{opt.sub}</span>}
+        { v: 'ltr', arrow: '→', label: 'Left → Right' },
+        { v: 'rtl', arrow: '←', label: 'Right → Left', sub: 'Manga' },
+      ].map(o => (
+        <button key={o.v} onClick={() => onChange(o.v)}
+          className={`${styles.dirBtn} ${value === o.v ? styles.dirActive : ''}`}>
+          <span className={styles.dirArrow}>{o.arrow}</span>
+          <span className={styles.dirLabel}>{o.label}</span>
+          {o.sub && <span className={styles.dirSub}>{o.sub}</span>}
         </button>
       ))}
     </div>
   );
 }
 
-// ── Keyboard shortcut grid ─────────────────────────────────────────────────
-const SHORTCUTS = [
-  { key: '← →', action: 'Previous / Next page' },
-  { key: 'Tap center', action: 'Smart panel zoom' },
-  { key: 'Double tap', action: 'Toggle 2× zoom' },
-  { key: 'Tap edge 20%', action: 'Prev / Next page' },
-  { key: 'Swipe', action: 'Turn pages' },
-  { key: 'Pinch', action: 'Free zoom 1–5×' },
-  { key: 'B', action: 'Toggle bookmark' },
-  { key: 'G', action: 'Go to page…' },
-  { key: 'F', action: 'Toggle fullscreen' },
-  { key: 'Esc', action: 'Exit reader' },
+// ── Colour swatches ───────────────────────────────────────────────────────
+const BG_OPTS = [
+  { v: '#000000', label: 'Black',  border: '#333' },
+  { v: '#1a1a1a', label: 'Dark',   border: '#444' },
+  { v: '#ffffff', label: 'White',  border: '#ccc' },
+  { v: '#f5f0e8', label: 'Sepia',  border: '#c8b89a' },
 ];
 
+function Swatches({ value, onChange }) {
+  return (
+    <div className={styles.swatches}>
+      {BG_OPTS.map(o => (
+        <div key={o.v} className={styles.swatchWrap}>
+          <button
+            className={`${styles.swatch} ${value === o.v ? styles.swatchOn : ''}`}
+            style={{ background: o.v, borderColor: value === o.v ? '#e50914' : o.border }}
+            onClick={() => onChange(o.v)}
+            title={o.label}
+          />
+          <span className={styles.swatchLabel}>{o.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Keyboard shortcut table ───────────────────────────────────────────────
+const SHORTCUTS = [
+  ['Tap left / right 20%', 'Previous / Next page'],
+  ['Tap center', 'Smart panel zoom'],
+  ['Double tap', 'Toggle 2× zoom'],
+  ['Swipe', 'Turn pages'],
+  ['Pinch', 'Free zoom 1–5×'],
+  ['Drag (zoomed)', 'Pan the page'],
+  ['← →', 'Navigate pages'],
+  ['B', 'Bookmark current page'],
+  ['G', 'Go to page…'],
+  ['F', 'Toggle fullscreen'],
+  ['Esc', 'Exit reader'],
+];
+
+// ── Stack badges ──────────────────────────────────────────────────────────
 const STACK = [
-  { label: 'React 18',    color: '#61dafb', bg: 'rgba(97,218,251,0.12)' },
-  { label: 'Vite 5',      color: '#a259ff', bg: 'rgba(162,89,255,0.12)' },
-  { label: 'Ant Design 5',color: '#1677ff', bg: 'rgba(22,119,255,0.12)' },
-  { label: 'Node.js',     color: '#68a063', bg: 'rgba(104,160,99,0.12)' },
-  { label: 'Express',     color: '#aaa',    bg: 'rgba(180,180,180,0.1)' },
-  { label: 'SQLite',      color: '#4a9eff', bg: 'rgba(74,158,255,0.12)' },
-  { label: 'unzipper',    color: '#f0a500', bg: 'rgba(240,165,0,0.12)'  },
-  { label: 'Google Drive',color: '#e50914', bg: 'rgba(229,9,20,0.12)'  },
+  { l: 'React 18',     c: '#61dafb', bg: 'rgba(97,218,251,0.1)'  },
+  { l: 'Vite 5',       c: '#a259ff', bg: 'rgba(162,89,255,0.1)'  },
+  { l: 'Ant Design 5', c: '#1677ff', bg: 'rgba(22,119,255,0.1)'  },
+  { l: 'Node.js',      c: '#68a063', bg: 'rgba(104,160,99,0.1)'  },
+  { l: 'SQLite',       c: '#4a9eff', bg: 'rgba(74,158,255,0.1)'  },
+  { l: 'unzipper',     c: '#f0a500', bg: 'rgba(240,165,0,0.1)'   },
+  { l: 'Google PKCE',  c: '#e50914', bg: 'rgba(229,9,20,0.1)'    },
+];
+
+// ── Section definitions ───────────────────────────────────────────────────
+const NAV = [
+  { id: 'reading',   icon: <ReadOutlined />,      label: 'Reading'   },
+  { id: 'display',   icon: <BgColorsOutlined />,   label: 'Display'   },
+  { id: 'shortcuts', icon: <KeyOutlined />,         label: 'Shortcuts' },
+  { id: 'about',     icon: <InfoCircleOutlined />,  label: 'About'     },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
   const { settings, updateSettings } = useAppStore();
+  const [active, setActive] = useState('reading');
 
   return (
     <div className={styles.page}>
-      {/* Page hero */}
-      <div className={styles.hero}>
-        <div className={styles.heroLeft}>
-          <h1 className={styles.heroTitle}>Settings</h1>
-          <p className={styles.heroSub}>Customise your reading experience</p>
+      {/* ── Left sidebar ──────────────────────────────────────────── */}
+      <nav className={styles.sidebar}>
+        <div className={styles.sidebarTop}>
+          <div className={styles.sidebarLogoMark}>
+            <svg viewBox="0 0 28 28" width="28" height="28">
+              <rect width="28" height="28" rx="6" fill="#0a0a0a"/>
+              <rect x="3" y="3" width="10" height="13" rx="1.5" fill="#e50914"/>
+              <rect x="15" y="3" width="10" height="6" rx="1.5" fill="#e50914" opacity="0.8"/>
+              <rect x="15" y="11" width="10" height="5" rx="1.5" fill="#e50914" opacity="0.5"/>
+              <rect x="3" y="18" width="6" height="7" rx="1.5" fill="#e50914" opacity="0.65"/>
+              <rect x="11" y="18" width="14" height="7" rx="1.5" fill="#e50914" opacity="0.9"/>
+            </svg>
+            <span className={styles.logoText}>Settings</span>
+          </div>
         </div>
-        <div className={styles.heroBadge}>COMIX</div>
-      </div>
 
-      <div className={styles.content}>
+        {NAV.map(n => (
+          <button
+            key={n.id}
+            className={`${styles.navItem} ${active === n.id ? styles.navActive : ''}`}
+            onClick={() => setActive(n.id)}
+          >
+            <span className={styles.navIcon}>{n.icon}</span>
+            <span className={styles.navLabel}>{n.label}</span>
+            {active === n.id && <span className={styles.navIndicator} />}
+          </button>
+        ))}
+      </nav>
 
-        {/* ── READING ─────────────────────────────────────────────────── */}
-        <Section delay={0}>
-          <SectionHead icon={<ReadOutlined />} title="Reading" subtitle="Page layout and navigation" />
-          <div className={styles.card}>
-            <SettingRow
-              label="Reading Direction"
-              description="Affects page turn direction and swipe gesture"
-            >
-              <DirectionPicker
+      {/* ── Right content panel ───────────────────────────────────── */}
+      <main className={styles.content}>
+
+        {/* READING ─────────────────────────────────────────────── */}
+        {active === 'reading' && (
+          <Panel title="Reading" subtitle="Page layout and navigation behaviour">
+            <Row label="Reading Direction" hint="Affects swipe direction and page-turn arrow sides">
+              <DirPicker
                 value={settings.readingDirection}
                 onChange={v => updateSettings({ readingDirection: v })}
               />
-            </SettingRow>
-
-            <div className={styles.divider} />
-
-            <SettingRow
-              label="Default Reading Mode"
-              description="How pages are laid out when you open a comic"
-            >
+            </Row>
+            <Row label="Default Mode" hint="How pages are displayed when you open a comic">
               <Select
                 value={settings.readingMode}
                 onChange={v => updateSettings({ readingMode: v })}
-                className={styles.select}
+                className={styles.sel}
                 options={[
                   { value: 'single', label: '⬜  Single Page' },
                   { value: 'double', label: '⬛⬜  Double Page Spread' },
                   { value: 'scroll', label: '↕  Vertical Scroll (Webtoon)' },
                 ]}
               />
-            </SettingRow>
-
-            <div className={styles.divider} />
-
-            <SettingRow
-              label="Page Transition"
-              description="Animation when turning pages"
-            >
+            </Row>
+            <Row label="Page Transition" hint="Animation shown when turning pages">
               <Select
                 value={settings.transitionAnimation}
                 onChange={v => updateSettings({ transitionAnimation: v })}
-                className={styles.select}
+                className={styles.sel}
                 options={[
                   { value: 'slide', label: '→  Slide' },
                   { value: 'fade',  label: '◌  Fade' },
-                  { value: 'none',  label: '×  Instant (no animation)' },
+                  { value: 'none',  label: '×  Instant' },
                 ]}
               />
-            </SettingRow>
-          </div>
-        </Section>
+            </Row>
+          </Panel>
+        )}
 
-        {/* ── DISPLAY ─────────────────────────────────────────────────── */}
-        <Section delay={60}>
-          <SectionHead icon={<BgColorsOutlined />} title="Display" subtitle="Zoom and background colour" />
-          <div className={styles.card}>
-            <SettingRow
-              label="Zoom Mode"
-              description="Behaviour when you tap the centre of a page"
-            >
+        {/* DISPLAY ─────────────────────────────────────────────── */}
+        {active === 'display' && (
+          <Panel title="Display" subtitle="Zoom behaviour and visual appearance">
+            <Row label="Zoom Mode" hint="What happens when you tap the centre of a page">
               <Select
                 value={settings.zoomMode}
                 onChange={v => updateSettings({ zoomMode: v })}
-                className={styles.select}
+                className={styles.sel}
                 options={[
-                  { value: 'smart',      label: '🎯  Smart Panel Zoom (recommended)' },
+                  { value: 'smart',      label: '🎯  Smart Panel Zoom' },
                   { value: 'manual',     label: '🔍  Manual Zoom' },
                   { value: 'fit-width',  label: '↔  Fit Width' },
                   { value: 'fit-height', label: '↕  Fit Height' },
                 ]}
               />
-            </SettingRow>
-
-            <div className={styles.divider} />
-
-            <SettingRow
-              label="Reader Background"
-              description="Colour shown behind pages in the reader"
-            >
-              <div className={styles.swatchRow}>
-                {BG_OPTIONS.map(opt => (
-                  <div key={opt.value} className={styles.swatchWrap}>
-                    <ColorSwatch
-                      value={opt.value}
-                      selected={settings.backgroundColor === opt.value}
-                      onChange={v => updateSettings({ backgroundColor: v })}
-                    />
-                    <span className={styles.swatchLabel}>{opt.label}</span>
-                  </div>
-                ))}
-              </div>
-            </SettingRow>
-
-            <div className={styles.divider} />
-
-            <SettingRow label="Show Page Numbers" description="Always-visible page counter at the bottom of the reader">
+            </Row>
+            <Row label="Reader Background" hint="Colour shown behind pages" fullWidth>
+              <Swatches
+                value={settings.backgroundColor}
+                onChange={v => updateSettings({ backgroundColor: v })}
+              />
+            </Row>
+            <Row label="Page Numbers" hint="Always show the current page / total at the bottom">
               <Switch
                 checked={settings.showPageNumber}
                 onChange={v => updateSettings({ showPageNumber: v })}
               />
-            </SettingRow>
-          </div>
-        </Section>
+            </Row>
+          </Panel>
+        )}
 
-        {/* ── SHORTCUTS ───────────────────────────────────────────────── */}
-        <Section delay={120}>
-          <SectionHead icon={<KeyOutlined />} title="Gestures & Shortcuts" subtitle="Available everywhere in the reader" />
-          <div className={styles.card}>
-            <div className={styles.shortcutGrid}>
-              {SHORTCUTS.map(({ key, action }) => (
-                <div key={key} className={styles.shortcutRow}>
+        {/* SHORTCUTS ───────────────────────────────────────────── */}
+        {active === 'shortcuts' && (
+          <Panel title="Gestures & Shortcuts" subtitle="All controls available inside the reader">
+            <div className={styles.kbdGrid}>
+              {SHORTCUTS.map(([key, action]) => (
+                <div key={key} className={styles.kbdRow}>
                   <kbd className={styles.kbd}>{key}</kbd>
-                  <span className={styles.shortcutAction}>{action}</span>
+                  <span className={styles.kbdAction}>{action}</span>
                 </div>
               ))}
             </div>
-          </div>
-        </Section>
+          </Panel>
+        )}
 
-        {/* ── ABOUT ───────────────────────────────────────────────────── */}
-        <Section delay={180}>
-          <SectionHead icon={<InfoCircleOutlined />} title="About COMIX" subtitle="Your personal comic library" />
-          <div className={styles.card}>
-            <div className={styles.aboutInner}>
+        {/* ABOUT ───────────────────────────────────────────────── */}
+        {active === 'about' && (
+          <Panel title="About COMIX" subtitle="Personal comic reader">
+            <div className={styles.aboutLayout}>
               <div className={styles.aboutLogo}>
-                <svg viewBox="0 0 48 48" width="48" height="48">
-                  <rect width="48" height="48" rx="10" fill="#0a0a0a"/>
-                  <rect x="4" y="4" width="18" height="22" rx="2.5" fill="#e50914"/>
-                  <rect x="25" y="4" width="19" height="10" rx="2.5" fill="#e50914" opacity="0.8"/>
-                  <rect x="25" y="17" width="19" height="9" rx="2.5" fill="#e50914" opacity="0.5"/>
-                  <rect x="4" y="29" width="11" height="15" rx="2.5" fill="#e50914" opacity="0.65"/>
-                  <rect x="18" y="29" width="26" height="15" rx="2.5" fill="#e50914" opacity="0.9"/>
+                <svg viewBox="0 0 56 56" width="56" height="56">
+                  <rect width="56" height="56" rx="12" fill="#0a0a0a"/>
+                  <rect x="4" y="4" width="22" height="30" rx="3" fill="#e50914"/>
+                  <rect x="30" y="4" width="22" height="14" rx="3" fill="#e50914" opacity="0.8"/>
+                  <rect x="30" y="21" width="22" height="13" rx="3" fill="#e50914" opacity="0.5"/>
+                  <rect x="4" y="38" width="13" height="14" rx="3" fill="#e50914" opacity="0.65"/>
+                  <rect x="21" y="38" width="31" height="14" rx="3" fill="#e50914" opacity="0.9"/>
                 </svg>
                 <div>
                   <div className={styles.aboutName}>COMIX</div>
-                  <div className={styles.aboutTagline}>Personal Comic Reader</div>
+                  <div className={styles.aboutVer}>v1.0.0 — Personal Build</div>
                 </div>
               </div>
               <p className={styles.aboutDesc}>
                 Read CBZ, CBR, PDF and image folders from your local drive or Google Drive.
-                Google Play Books–style smart panel zoom, Netflix-style library, up to 5 GB per file.
+                Google Play Books–style smart panel zoom, Netflix-style library,
+                up to 5 GB per file, PKCE-based Google auth.
               </p>
-              <div className={styles.stackGrid}>
-                {STACK.map(({ label, color, bg }) => (
-                  <span key={label} className={styles.stackBadge} style={{ color, background: bg, borderColor: `${color}33` }}>
-                    {label}
+              <Divider style={{ borderColor: 'rgba(255,255,255,0.07)', margin: '12px 0' }} />
+              <div className={styles.stackWrap}>
+                {STACK.map(s => (
+                  <span key={s.l} className={styles.badge}
+                    style={{ color: s.c, background: s.bg, borderColor: `${s.c}33` }}>
+                    {s.l}
                   </span>
                 ))}
               </div>
             </div>
-          </div>
-        </Section>
+          </Panel>
+        )}
 
-        <div style={{ height: 48 }} />
+      </main>
+    </div>
+  );
+}
+
+// ── Panel wrapper ─────────────────────────────────────────────────────────
+function Panel({ title, subtitle, children }) {
+  return (
+    <div className={styles.panel}>
+      <div className={styles.panelHead}>
+        <h2 className={styles.panelTitle}>{title}</h2>
+        {subtitle && <p className={styles.panelSub}>{subtitle}</p>}
       </div>
+      <div className={styles.panelBody}>{children}</div>
     </div>
   );
 }
