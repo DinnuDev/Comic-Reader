@@ -96,18 +96,32 @@ app.use('/api/setup', setupRoutes);
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 
 if (hasFrontendBuild) {
-  app.use(express.static(frontendDistDir));
+  app.use('/assets', express.static(path.join(frontendDistDir, 'assets'), {
+    fallthrough: false,
+    maxAge: '1y',
+    immutable: true,
+  }));
+
+  app.use(express.static(frontendDistDir, { index: false }));
 
   app.get('*', (req, res, next) => {
     if (
       req.path.startsWith('/api') ||
+      req.path.startsWith('/assets') ||
       req.path.startsWith('/covers') ||
       req.path.startsWith('/cache')
     ) {
       return next();
     }
 
-    return res.sendFile(frontendIndexPath);
+    // Do not serve index.html for explicit file requests (e.g. *.js, *.css, *.map)
+    if (path.extname(req.path)) {
+      return res.status(404).end();
+    }
+
+    return res.sendFile(frontendIndexPath, (err) => {
+      if (err) return next(err);
+    });
   });
 } else {
   // Root endpoint for platform/browser probes when no frontend build is present
