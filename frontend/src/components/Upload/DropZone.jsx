@@ -10,13 +10,13 @@
  * - When indexing finishes the ghost card is removed and the real library
  *   card takes its place (triggered by cache invalidation in the poller hook).
  */
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Typography, Progress } from 'antd';
 import {
   InboxOutlined, CheckCircleOutlined, CloseCircleOutlined,
   LoadingOutlined, FileOutlined, SyncOutlined,
 } from '@ant-design/icons';
-import { uploadApi } from '../../services/api';
+import { uploadApi, readerApi } from '../../services/api';
 import { useAppStore } from '../../store';
 import styles from './DropZone.module.css';
 
@@ -40,7 +40,12 @@ function titleFromFilename(name) {
   return name.replace(/\.[^.]+$/, '');
 }
 
-export default function DropZone({ onUploaded, compact = false }) {
+export default function DropZone({
+  onUploaded,
+  compact = false,
+  hidden = false,
+  triggerFileDialogKey = 0,
+}) {
   const { queueAddUpload, queueUpdateUpload, queueRemoveUpload } = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
   const [items, setItems] = useState([]);    // list view inside the drawer
@@ -49,6 +54,14 @@ export default function DropZone({ onUploaded, compact = false }) {
   const dragCounter = useRef(0);
   const abortRef = useRef(null);
   const startTimeRef = useRef(0);
+  const lastDialogTriggerRef = useRef(0);
+
+  useEffect(() => {
+    if (triggerFileDialogKey > 0 && triggerFileDialogKey !== lastDialogTriggerRef.current) {
+      lastDialogTriggerRef.current = triggerFileDialogKey;
+      inputRef.current?.click();
+    }
+  }, [triggerFileDialogKey]);
 
   const validate = (files) => {
     const valid = [], invalid = [];
@@ -81,10 +94,12 @@ export default function DropZone({ onUploaded, compact = false }) {
     const pendingMeta = valid.map(f => ({
       localId: `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       title: titleFromFilename(f.name),
+      fileName: f.name,
       size: f.size,
       status: 'uploading',
       percent: 0,
       comicId: null,
+      thumbnailUrl: null,
     }));
 
     pendingMeta.forEach(m => queueAddUpload(m));
@@ -142,14 +157,25 @@ export default function DropZone({ onUploaded, compact = false }) {
         if (r?.status === 'added') {
           const localItem = pendingMeta.find((_, i) => valid[i]?.name === it.name);
           if (localItem) {
+            const coverUrl = `${readerApi.getCoverUrl(r.id)}?t=${Date.now()}`;
             if (r.processing) {
               // Still indexing in background
-              queueUpdateUpload(localItem.localId, { status: 'indexing', comicId: r.id });
+              queueUpdateUpload(localItem.localId, {
+                status: 'indexing',
+                comicId: r.id,
+                thumbnailUrl: coverUrl,
+                percent: 100,
+              });
               newProcessingIds.push(r.id);
               return { ...it, status: 'indexing', percent: 100 };
             } else {
               // Fully processed (small file)
-              queueUpdateUpload(localItem.localId, { status: 'done', comicId: r.id });
+              queueUpdateUpload(localItem.localId, {
+                status: 'done',
+                comicId: r.id,
+                thumbnailUrl: coverUrl,
+                percent: 100,
+              });
               setTimeout(() => queueRemoveUpload(localItem.localId), 1200);
               return { ...it, status: 'done', percent: 100 };
             }
@@ -200,6 +226,19 @@ export default function DropZone({ onUploaded, compact = false }) {
 
   const clearDone = () =>
     setItems(prev => prev.filter(i => i.status !== 'done' && i.status !== 'duplicate'));
+
+  if (hidden) {
+    return (
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept=".cbz,.cbr,.zip,.pdf"
+        style={{ display: 'none' }}
+        onChange={e => { handleFiles(e.target.files); e.target.value = ''; }}
+      />
+    );
+  }
 
   if (compact) {
     return (

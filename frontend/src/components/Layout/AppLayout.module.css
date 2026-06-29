@@ -47,9 +47,11 @@
 
 .logoText {
   font-size: 18px;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-weight: 700;
   color: #e50914;
   letter-spacing: 2px;
+  line-height: 1;
 }
 
 /* Nav links */

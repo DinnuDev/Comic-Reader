@@ -1,4 +1,6 @@
-/* â”€â”€ Global reset & Netflix palette â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap');
+
+/* Global reset & Netflix palette */
 :root {
   --bg:       #0a0a0a;
   --bg-card:  #141414;
@@ -8,6 +10,11 @@
   --text:     #e5e5e5;
   --text-dim: rgba(255,255,255,0.55);
   --border:   rgba(255,255,255,0.08);
+  --font-display: 'Caveat', cursive;
+  /* Aliases used by legacy styles in this file */
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #141414;
+  --text-primary: #e5e5e5;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -34,6 +41,62 @@ html, body {
 .ant-modal-content { background: #181818 !important; }
 .ant-modal-header { background: #181818 !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; }
 .ant-modal-title { color: #e5e5e5 !important; }
+.ant-modal-body,
+.ant-modal-confirm-content,
+.ant-modal-confirm-title,
+.ant-modal .ant-typography,
+.ant-modal .ant-form-item-label > label,
+.ant-modal .ant-form-item-explain,
+.ant-modal .ant-form-item-extra,
+.ant-modal .ant-input,
+.ant-modal .ant-input-number,
+.ant-modal .ant-select-selection-item,
+.ant-modal .ant-select-selection-placeholder {
+  color: #e7e7e7 !important;
+}
+
+.ant-drawer-body,
+.ant-drawer .ant-typography,
+.ant-drawer .ant-form-item-label > label,
+.ant-drawer .ant-form-item-explain,
+.ant-drawer .ant-form-item-extra,
+.ant-drawer .ant-input,
+.ant-drawer .ant-input-number,
+.ant-drawer .ant-select-selection-item,
+.ant-drawer .ant-select-selection-placeholder {
+  color: #e7e7e7 !important;
+}
+
+.ant-modal .ant-typography-secondary,
+.ant-modal .ant-form-item-extra,
+.ant-drawer .ant-typography-secondary,
+.ant-drawer .ant-form-item-extra,
+.ant-popconfirm-description,
+.ant-empty-description {
+  color: rgba(255, 255, 255, 0.78) !important;
+}
+
+.ant-popconfirm-title,
+.ant-modal-confirm-title,
+.ant-modal-title,
+.ant-empty-description,
+.ant-message-custom-content,
+.ant-notification-notice-message {
+  color: #f0f0f0 !important;
+}
+
+.ant-modal .ant-input::placeholder,
+.ant-drawer .ant-input::placeholder {
+  color: rgba(255, 255, 255, 0.58) !important;
+}
+
+.ant-btn-text {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+.ant-btn-text:hover {
+  color: #ffffff !important;
+}
 .ant-select-dropdown { background: #1f1f1f !important; }
 .ant-card { background: #141414 !important; border: 1px solid rgba(255,255,255,0.06) !important; }
 .ant-card-head { border-bottom: 1px solid rgba(255,255,255,0.08) !important; color: #e5e5e5 !important; }
@@ -94,6 +157,12 @@ html, body {
 .ant-notification-notice { background: #1f1f1f !important; border: 1px solid rgba(255,255,255,0.1) !important; }
 .ant-notification-notice-message { color: #e5e5e5 !important; }
 .ant-notification-notice-description { color: rgba(255,255,255,0.65) !important; }
+
+.ant-tooltip .ant-tooltip-inner {
+  background: #181818 !important;
+  color: #efefef !important;
+  border: 1px solid rgba(255,255,255,0.12);
+}
 
 
 * { box-sizing: border-box; }

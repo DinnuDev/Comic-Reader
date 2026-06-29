@@ -5,6 +5,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const db = require('../db/database');
 const { v4: uuidv4 } = require('uuid');
 const comicService = require('../services/comicService');
@@ -16,6 +17,21 @@ const ALLOWED_EXTS = ['.cbz', '.cbr', '.zip', '.pdf'];
 
 // 5 GB limit
 const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024;
+
+function normalizeComicTitle(fileName) {
+  // Strip leading timestamp prefix added by storage naming, e.g. 1782718397000_Title.cbz
+  return fileName.replace(/^\d{10,}_/, '');
+}
+
+function hashFileSha256(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(filePath);
+    stream.on('error', reject);
+    stream.on('data', chunk => hash.update(chunk));
+    stream.on('end', () => resolve(hash.digest('hex')));
+  });
+}
 
 // ── Multer: stream directly to disk, no memory buffering ─────────────────
 const storage = multer.diskStorage({
@@ -66,14 +82,18 @@ router.post('/', upload.array('files', 10), async (req, res) => {
   for (const file of req.files) {
     try {
       const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
-      const title = path.basename(file.originalname, path.extname(file.originalname));
+      const title = normalizeComicTitle(
+        path.basename(file.originalname, path.extname(file.originalname))
+      );
       const filePath = file.path;
       const isLarge = file.size > 200 * 1024 * 1024; // > 200 MB
+      const contentHash = await hashFileSha256(filePath);
 
-      // Skip exact duplicates
-      const existing = db.prepare('SELECT id FROM comics WHERE file_path = ?').get(filePath);
+      // Skip duplicate uploads by file contents, regardless of filename/path.
+      const existing = db.prepare('SELECT id, title FROM comics WHERE content_hash = ?').get(contentHash);
       if (existing) {
-        results.push({ id: existing.id, title, status: 'duplicate' });
+        try { fs.unlinkSync(filePath); } catch {}
+        results.push({ id: existing.id, title: existing.title || title, status: 'duplicate' });
         continue;
       }
 
@@ -87,15 +107,17 @@ router.post('/', upload.array('files', 10), async (req, res) => {
       }
 
       db.prepare(`
-        INSERT INTO comics (id, source_id, title, file_path, file_type, file_size, page_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(id, source.id, title, filePath, ext, file.size, pageCount);
+        INSERT INTO comics (id, source_id, title, file_path, file_type, file_size, page_count, content_hash)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, source.id, title, filePath, ext, file.size, pageCount, contentHash);
 
       // Always generate cover async
       comicService.generateCoverAsync(id, filePath, ext);
 
-      // For large files, count pages in background
-      if (isLarge) {
+      // Count pages in background whenever still unknown.
+      // This covers both large files and edge cases where sync counting
+      // returns 0 for a file that can still be processed asynchronously.
+      if (isLarge || pageCount === 0) {
         comicService.updatePageCountAsync(id, filePath, ext);
       }
 
@@ -105,7 +127,7 @@ router.post('/', upload.array('files', 10), async (req, res) => {
         file_type: ext,
         file_size: file.size,
         page_count: pageCount,
-        processing: isLarge, // true = still counting pages in background
+        processing: isLarge || pageCount === 0, // true = counting pages in background
         status: 'added',
       });
     } catch (err) {

@@ -1,9 +1,17 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { notification, Drawer, Button } from 'antd';
-import { UploadOutlined, PlusCircleOutlined, ReloadOutlined } from '@ant-design/icons';
+import { notification, Button, Modal, Tooltip } from 'antd';
+import {
+  UploadOutlined,
+  PlusCircleOutlined,
+  ReloadOutlined,
+  DeleteOutlined,
+  CheckSquareOutlined,
+  CopyOutlined,
+  CloseOutlined,
+} from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { libraryApi, sourcesApi } from '../services/api';
+import { libraryApi, sourcesApi, readerApi } from '../services/api';
 import ComicCard from '../components/Library/ComicCard';
 import ProcessingCard from '../components/Library/ProcessingCard';
 import HeroSection from '../components/Library/HeroSection';
@@ -15,6 +23,15 @@ import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { useProcessingPoller } from '../hooks/useProcessingPoller';
 import { useAppStore } from '../store';
 import styles from './LibraryPage.module.css';
+
+function normalizeTitleKey(title) {
+  return (title || '')
+    .toLowerCase()
+    .replace(/\.[a-z0-9]{2,5}$/i, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 // Animated wrapper for the hero
 function AnimatedHero({ children }) {
@@ -36,8 +53,10 @@ export default function LibraryPage() {
   const queryClient = useQueryClient();
   const { uploadQueue } = useAppStore();
 
-  const [showUpload, setShowUpload] = useState(false);
+  const [uploadDialogKey, setUploadDialogKey] = useState(0);
   const [scanningId, setScanningId] = useState(null);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedComicIds, setSelectedComicIds] = useState([]);
   const [notifApi, ctxHolder] = notification.useNotification();
 
   const urlSearch = searchParams.get('search') || '';
@@ -94,6 +113,21 @@ export default function LibraryPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: libraryApi.deleteComic,
+    onSuccess: () => {
+      notifApi.success({ message: 'Comic offloaded' });
+      queryClient.invalidateQueries({ queryKey: ['library'] });
+      queryClient.invalidateQueries({ queryKey: ['recent'] });
+    },
+    onError: (err) => {
+      notifApi.error({
+        message: 'Failed to offload comic',
+        description: err?.response?.data?.error || err?.message || 'Unknown error',
+      });
+    },
+  });
+
   const handleScanAll = async () => {
     for (const s of (sources || [])) {
       setScanningId(s.id);
@@ -109,6 +143,52 @@ export default function LibraryPage() {
     queryClient.invalidateQueries({ queryKey: ['sources'] });
     queryClient.invalidateQueries({ queryKey: ['recent'] });
   }, [queryClient]);
+
+  const openUploadDialog = useCallback(() => {
+    setUploadDialogKey((k) => k + 1);
+  }, []);
+
+  const toggleSelectComic = useCallback((comicId) => {
+    setSelectedComicIds(prev => (
+      prev.includes(comicId)
+        ? prev.filter(id => id !== comicId)
+        : [...prev, comicId]
+    ));
+  }, []);
+
+  const exitBulkMode = useCallback(() => {
+    setBulkMode(false);
+    setSelectedComicIds([]);
+  }, []);
+
+  const offloadSelected = useCallback(() => {
+    if (selectedComicIds.length === 0) return;
+    Modal.confirm({
+      title: `Offload ${selectedComicIds.length} selected comic${selectedComicIds.length > 1 ? 's' : ''}?`,
+      content: 'This removes selected comics from your library. Files on disk are not deleted.',
+      okText: 'Offload Selected',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancel',
+      onOk: async () => {
+        const results = await Promise.allSettled(
+          selectedComicIds.map(id => libraryApi.deleteComic(id))
+        );
+        const failed = results.filter(r => r.status === 'rejected').length;
+        const removed = results.length - failed;
+
+        if (removed > 0) {
+          notifApi.success({ message: `Offloaded ${removed} comic${removed > 1 ? 's' : ''}` });
+        }
+        if (failed > 0) {
+          notifApi.error({ message: `Failed to offload ${failed} comic${failed > 1 ? 's' : ''}` });
+        }
+
+        queryClient.invalidateQueries({ queryKey: ['library'] });
+        queryClient.invalidateQueries({ queryKey: ['recent'] });
+        setSelectedComicIds([]);
+      },
+    });
+  }, [selectedComicIds, notifApi, queryClient]);
 
   // ── Derived data ─────────────────────────────────────────────────────────
   const comics = allData?.comics || [];
@@ -132,6 +212,17 @@ export default function LibraryPage() {
 
   const favorites = useMemo(() => readyComics.filter(c => c.is_favorite), [readyComics]);
 
+  const duplicateComicIds = useMemo(() => {
+    const map = new Map();
+    readyComics.forEach((c) => {
+      const key = normalizeTitleKey(c.title);
+      if (!key) return;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(c.id);
+    });
+    return Array.from(map.values()).filter(ids => ids.length > 1).flat();
+  }, [readyComics]);
+
   const series = useMemo(() => {
     const map = {};
     readyComics.forEach(c => {
@@ -145,11 +236,44 @@ export default function LibraryPage() {
 
   const heroComic = continueReading[0] || recentlyAdded[0] || null;
 
+  useEffect(() => {
+    const valid = new Set(readyComics.map(c => c.id));
+    setSelectedComicIds(prev => prev.filter(id => valid.has(id)));
+  }, [readyComics]);
+
   const cardProps = (comic) => ({
     comic,
-    onRead: () => navigate(`/read/${comic.id}`),
+    onRead: () => {
+      if (bulkMode) {
+        toggleSelectComic(comic.id);
+        return;
+      }
+      navigate(`/read/${comic.id}`);
+    },
     onFavorite: () => favMutation.mutate(comic.id),
+    onOffload: (c) => {
+      Modal.confirm({
+        title: `Offload "${c.title}"?`,
+        content: 'This removes the comic from your library. The file on disk is not deleted.',
+        okText: 'Offload',
+        okButtonProps: { danger: true },
+        cancelText: 'Cancel',
+        onOk: () => deleteMutation.mutate(c.id),
+      });
+    },
+    bulkMode,
+    selected: selectedComicIds.includes(comic.id),
+    onToggleSelect: toggleSelectComic,
   });
+
+  const selectAllVisible = useCallback(() => {
+    const ids = readyComics.map(c => c.id);
+    setSelectedComicIds(ids);
+  }, [readyComics]);
+
+  const selectDuplicatesOnly = useCallback(() => {
+    setSelectedComicIds(duplicateComicIds);
+  }, [duplicateComicIds]);
 
   // ── Processing items = uploadQueue + scan-indexing comics ────────────────
   const allProcessing = [
@@ -162,6 +286,7 @@ export default function LibraryPage() {
       status: 'indexing',
       percent: 0,
       comicId: c.id,
+      thumbnailUrl: c.cover_path || readerApi.getCoverUrl(c.id),
     })),
   ];
 
@@ -194,7 +319,7 @@ export default function LibraryPage() {
   }
 
   // ── Empty library ────────────────────────────────────────────────────────
-  const isEmpty = comics.length === 0 && uploadQueue.length === 0;
+  const isEmpty = comics.length === 0;
   if (isEmpty) {
     return (
       <div className={styles.page}>
@@ -202,13 +327,13 @@ export default function LibraryPage() {
         <div className={styles.emptyScreen}>
           <div className={styles.emptyInner}>
             <div className={styles.emptyIcon}>📚</div>
-            <h2 className={styles.emptyTitle}>Your library is empty</h2>
+            <h2 className={`${styles.emptyTitle} ${styles.displayType}`}>Your library is empty</h2>
             <p className={styles.emptySubtitle}>
               Upload comics directly or add a local folder source.
             </p>
             <div className={styles.emptyActions}>
               <Button type="primary" size="large" icon={<UploadOutlined />}
-                onClick={() => setShowUpload(true)}
+                onClick={openUploadDialog}
                 style={{ background: '#e50914', borderColor: '#e50914' }}>
                 Upload Comics
               </Button>
@@ -222,10 +347,11 @@ export default function LibraryPage() {
             </div>
           </div>
         </div>
-        <Drawer title="Upload Comics" placement="right" width={480}
-          open={showUpload} onClose={() => setShowUpload(false)}>
-          <DropZone onUploaded={handleUploaded} />
-        </Drawer>
+        <DropZone
+          hidden
+          onUploaded={handleUploaded}
+          triggerFileDialogKey={uploadDialogKey}
+        />
       </div>
     );
   }
@@ -248,14 +374,50 @@ export default function LibraryPage() {
 
       {/* Toolbar */}
       <div className={styles.toolbar}>
-        <Button icon={<UploadOutlined />} onClick={() => setShowUpload(true)}>Upload</Button>
-        {(sources || []).length > 0 && (
-          <Button icon={<ReloadOutlined spin={!!scanningId} />} loading={!!scanningId}
-            onClick={handleScanAll}>
-            Scan All
-          </Button>
+        <Tooltip title="Upload comics">
+          <Button className={styles.iconOnlyBtn} icon={<UploadOutlined />} onClick={openUploadDialog} aria-label="Upload comics" />
+        </Tooltip>
+        {!bulkMode && (
+          <Tooltip title="Bulk offload mode">
+            <Button className={styles.iconOnlyBtn} icon={<DeleteOutlined />} danger onClick={() => setBulkMode(true)} aria-label="Bulk offload mode" />
+          </Tooltip>
         )}
-        <Button icon={<PlusCircleOutlined />} onClick={() => navigate('/sources')}>Sources</Button>
+        {bulkMode && (
+          <Tooltip title={`Select all (${readyComics.length})`}>
+            <Button className={styles.iconOnlyBtn} icon={<CheckSquareOutlined />} onClick={selectAllVisible} disabled={readyComics.length === 0} aria-label="Select all comics" />
+          </Tooltip>
+        )}
+        {bulkMode && (
+          <Tooltip title={`Select duplicates only (${duplicateComicIds.length})`}>
+            <Button className={styles.iconOnlyBtn} icon={<CopyOutlined />} onClick={selectDuplicatesOnly} disabled={duplicateComicIds.length === 0} aria-label="Select duplicate comics" />
+          </Tooltip>
+        )}
+        {bulkMode && (
+          <Tooltip title={`Offload selected (${selectedComicIds.length})`}>
+            <Button
+              className={styles.iconOnlyBtn}
+              icon={<DeleteOutlined />}
+              danger
+              disabled={selectedComicIds.length === 0}
+              onClick={offloadSelected}
+              aria-label="Offload selected comics"
+            />
+          </Tooltip>
+        )}
+        {bulkMode && (
+          <Tooltip title="Exit bulk mode">
+            <Button className={styles.iconOnlyBtn} icon={<CloseOutlined />} onClick={exitBulkMode} aria-label="Exit bulk mode" />
+          </Tooltip>
+        )}
+        {(sources || []).length > 0 && (
+          <Tooltip title="Scan all sources">
+            <Button className={styles.iconOnlyBtn} icon={<ReloadOutlined spin={!!scanningId} />} loading={!!scanningId}
+              onClick={handleScanAll} aria-label="Scan all sources" />
+          </Tooltip>
+        )}
+        <Tooltip title="Go to sources">
+          <Button className={styles.iconOnlyBtn} icon={<PlusCircleOutlined />} onClick={() => navigate('/sources')} aria-label="Go to sources" />
+        </Tooltip>
       </div>
 
       {/* ── PROCESSING ROW — shown whenever anything is uploading/indexing ── */}
@@ -301,11 +463,11 @@ export default function LibraryPage() {
 
       <div style={{ height: 48 }} />
 
-      {/* Upload drawer */}
-      <Drawer title="Upload Comics" placement="right" width={480}
-        open={showUpload} onClose={() => setShowUpload(false)}>
-        <DropZone onUploaded={handleUploaded} />
-      </Drawer>
+      <DropZone
+        hidden
+        onUploaded={handleUploaded}
+        triggerFileDialogKey={uploadDialogKey}
+      />
     </div>
   );
 }

@@ -73,6 +73,19 @@ function migrate() {
     );
   `);
 
+  // Add content hash support for duplicate prevention (safe on existing DBs)
+  try {
+    db.exec('ALTER TABLE comics ADD COLUMN content_hash TEXT');
+  } catch {
+    // Column already exists
+  }
+
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_comics_content_hash
+    ON comics(content_hash)
+    WHERE content_hash IS NOT NULL;
+  `);
+
   console.log('Database migrated successfully');
 }
 

@@ -1,42 +1,76 @@
 import React, { memo } from 'react';
-import { HeartFilled, HeartOutlined, PlayCircleFilled } from '@ant-design/icons';
+import {
+  HeartFilled, HeartOutlined, PlayCircleFilled, DeleteOutlined, CheckCircleFilled,
+} from '@ant-design/icons';
 import { readerApi } from '../../services/api';
-import { useLazyImage } from '../../hooks/useScrollAnimation';
 import styles from './ComicCard.module.css';
 
-function ComicCard({ comic, onRead, onFavorite, size = 'md' }) {
+function ComicCard({
+  comic,
+  onRead,
+  onFavorite,
+  onOffload,
+  bulkMode = false,
+  selected = false,
+  onToggleSelect,
+  size = 'md',
+}) {
   const [hovered, setHovered] = React.useState(false);
-  const rawCoverUrl = comic.cover_path || readerApi.getCoverUrl(comic.id);
-  const [imgRef, lazySrc, , onImgLoad] = useLazyImage(rawCoverUrl);
+  const [useFallbackCover, setUseFallbackCover] = React.useState(false);
+  const [imgLoaded, setImgLoaded] = React.useState(false);
+  const primaryCoverUrl = comic.cover_path
+    ? `${comic.cover_path}${comic.cover_path.includes('?') ? '&' : '?'}t=${comic.date_added || ''}`
+    : '';
+  const fallbackCoverUrl = `${readerApi.getCoverUrl(comic.id)}?t=${comic.date_added || ''}`;
+  const coverUrl = useFallbackCover || !primaryCoverUrl ? fallbackCoverUrl : primaryCoverUrl;
   const progress = comic.total_pages > 0
     ? Math.round((comic.current_page / comic.total_pages) * 100)
     : 0;
 
+  React.useEffect(() => {
+    setUseFallbackCover(false);
+    setImgLoaded(false);
+  }, [primaryCoverUrl, comic.id]);
+
   const actionLabel = progress > 0 && progress < 100 ? `${progress}%` : progress === 100 ? 'Done' : null;
+
+  const handleCardClick = () => {
+    if (bulkMode) {
+      onToggleSelect?.(comic.id);
+      return;
+    }
+    onRead();
+  };
 
   return (
     <div
-      className={`${styles.card} ${styles[size]} ${hovered ? styles.hovered : ''}`}
+      className={`${styles.card} ${styles[size]} ${hovered ? styles.hovered : ''} ${bulkMode ? styles.bulkMode : ''} ${selected ? styles.selected : ''}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onClick={onRead}
+      onClick={handleCardClick}
       role="button"
       tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && onRead()}
+      onKeyDown={e => e.key === 'Enter' && handleCardClick()}
       aria-label={`Read ${comic.title}`}
     >
       {/* Cover */}
       <div className={styles.coverWrap}>
         <img
-          ref={imgRef}
-          src={lazySrc || ''}
+          src={coverUrl}
           alt={comic.title}
           className={styles.cover}
-          onLoad={onImgLoad}
-          style={{ opacity: lazySrc ? 1 : 0 }}
+          loading="lazy"
+          onLoad={() => setImgLoaded(true)}
+          onError={() => {
+            if (!useFallbackCover && primaryCoverUrl) {
+              setUseFallbackCover(true);
+              setImgLoaded(false);
+            }
+          }}
+          style={{ opacity: imgLoaded ? 1 : 0 }}
         />
         {/* Fallback letter when no cover yet */}
-        {!lazySrc && (
+        {!imgLoaded && (
           <div className={styles.coverFallback}>
             <span>{(comic.title || '?')[0].toUpperCase()}</span>
           </div>
@@ -51,6 +85,12 @@ function ComicCard({ comic, onRead, onFavorite, size = 'md' }) {
         <div className={styles.playOverlay}>
           <PlayCircleFilled className={styles.playIcon} />
         </div>
+
+        {bulkMode && (
+          <div className={`${styles.selectBadge} ${selected ? styles.selectBadgeActive : ''}`}>
+            {selected ? <CheckCircleFilled /> : <span className={styles.selectBadgeDot} />}
+          </div>
+        )}
       </div>
 
       {/* Hover info panel */}
@@ -77,6 +117,14 @@ function ComicCard({ comic, onRead, onFavorite, size = 'md' }) {
             >
               {comic.is_favorite ? <HeartFilled /> : <HeartOutlined />}
             </button>
+            <button
+              className={styles.offloadBtn}
+              onClick={e => { e.stopPropagation(); onOffload?.(comic); }}
+              aria-label="Offload"
+              title="Offload comic"
+            >
+              <DeleteOutlined />
+            </button>
           </div>
         </div>
       </div>
@@ -88,5 +136,9 @@ export default memo(ComicCard, (prev, next) =>
   prev.comic.id === next.comic.id &&
   prev.comic.is_favorite === next.comic.is_favorite &&
   prev.comic.current_page === next.comic.current_page &&
+  prev.comic.cover_path === next.comic.cover_path &&
+  prev.comic.page_count === next.comic.page_count &&
+  prev.bulkMode === next.bulkMode &&
+  prev.selected === next.selected &&
   prev.size === next.size
 );

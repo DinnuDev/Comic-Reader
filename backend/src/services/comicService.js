@@ -21,6 +21,11 @@ const { v4: uuidv4 } = require('uuid');
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.bmp']);
 const COMIC_EXTS = ['.cbz', '.cbr', '.zip', '.pdf'];
 
+function normalizeComicTitle(fileName) {
+  // Strip leading timestamp prefix added by upload storage naming.
+  return fileName.replace(/^\d{10,}_/, '');
+}
+
 // ── ZIP helpers (streaming, memory-efficient) ─────────────────────────────
 
 /**
@@ -101,7 +106,7 @@ async function scanSource(source) {
     const stat = fs.statSync(filePath);
     const isDir = stat.isDirectory();
     const ext = isDir ? 'folder' : path.extname(filePath).toLowerCase().replace('.', '');
-    const title = path.basename(filePath, path.extname(filePath));
+    const title = normalizeComicTitle(path.basename(filePath, path.extname(filePath)));
     const id = uuidv4();
 
     // For very large files, register immediately with page_count = 0
@@ -115,7 +120,7 @@ async function scanSource(source) {
     `).run(id, source.id, title, filePath, ext, isDir ? 0 : stat.size, pageCount);
 
     generateCoverAsync(id, filePath, ext);
-    if (isLarge) updatePageCountAsync(id, filePath, ext);
+    if (isLarge || pageCount === 0) updatePageCountAsync(id, filePath, ext);
 
     added++;
   }

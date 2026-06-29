@@ -23,6 +23,14 @@
   transition: transform 0.25s ease, z-index 0s;
 }
 
+.bulkMode {
+  cursor: pointer;
+}
+
+.selected .coverWrap {
+  box-shadow: inset 0 0 0 2px #10b981;
+}
+
 /* Cover wrapper */
 .coverWrap {
   position: relative;
@@ -87,6 +95,33 @@
   font-size: 42px;
   color: rgba(255,255,255,0.9);
   filter: drop-shadow(0 2px 8px rgba(0,0,0,0.8));
+}
+
+.selectBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  color: #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.selectBadgeActive {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.16);
+}
+
+.selectBadgeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
 }
 
 /* ── INFO PANEL (expands below card on hover) ──── */
@@ -174,6 +209,27 @@
 
 .favIconBtn:hover { border-color: #fff; color: #fff; }
 .favActive { color: #e50914 !important; border-color: #e50914 !important; }
+
+.offloadBtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 80, 80, 0.55);
+  background: transparent;
+  color: rgba(255, 120, 120, 0.85);
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.offloadBtn:hover {
+  border-color: #ff4d4f;
+  color: #ff7a7c;
+  background: rgba(255, 77, 79, 0.12);
+}
 
 @media (max-width: 600px) {
   .card.hovered { transform: scale(1.05) translateY(-3px); }

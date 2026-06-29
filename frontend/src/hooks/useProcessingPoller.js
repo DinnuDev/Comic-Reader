@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { uploadApi } from '../services/api';
+import { uploadApi, readerApi } from '../services/api';
 import { useAppStore } from '../store';
 
 /**
@@ -39,7 +39,10 @@ export function useProcessingPoller(libraryComics = []) {
         try {
           const status = await uploadApi.getStatus(item.comicId);
           if (!status.processing) {
-            queueUpdateUpload(item.localId, { status: 'done' });
+            queueUpdateUpload(item.localId, {
+              status: 'done',
+              thumbnailUrl: `${readerApi.getCoverUrl(item.comicId)}?t=${Date.now()}`,
+            });
             setTimeout(() => {
               queueRemoveUpload(item.localId);
               queryClient.invalidateQueries({ queryKey: ['library'] });
