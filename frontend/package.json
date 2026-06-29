@@ -8,20 +8,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ant-design/cssinjs": "^1.18.3",
+    "@ant-design/icons": "^5.3.1",
+    "@react-spring/web": "^9.7.3",
+    "@tanstack/react-query": "^5.24.1",
+    "@use-gesture/react": "^10.3.0",
+    "antd": "^5.14.1",
+    "axios": "^1.6.7",
+    "comic-reader-backend": "file:../backend",
+    "dayjs": "^1.11.10",
+    "hammerjs": "^2.0.8",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0",
-    "antd": "^5.14.1",
-    "@ant-design/icons": "^5.3.1",
-    "@ant-design/cssinjs": "^1.18.3",
-    "zustand": "^4.5.2",
-    "@tanstack/react-query": "^5.24.1",
-    "axios": "^1.6.7",
-    "hammerjs": "^2.0.8",
-    "@use-gesture/react": "^10.3.0",
     "react-spring": "^9.7.3",
-    "@react-spring/web": "^9.7.3",
-    "dayjs": "^1.11.10"
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
