@@ -38,15 +38,31 @@ dataDirs.forEach(dir => {
 // Security
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-const allowedOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || [
+const defaultAllowedOrigins = [
   'http://localhost:5173',
   'https://comic-reader-fkbe.onrender.com',
-]).toString().split(',').map(origin => origin.trim()).filter(Boolean);
+];
+
+const configuredOrigins = [process.env.FRONTEND_URLS, process.env.FRONTEND_URL]
+  .filter(Boolean)
+  .join(',')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+const allowedOrigins = Array.from(new Set([
+  ...defaultAllowedOrigins,
+  ...configuredOrigins,
+]));
+
+function isRenderOrigin(origin) {
+  return /^https:\/\/[a-z0-9-]+\.onrender\.com$/i.test(origin);
+}
 
 // CORS
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || isRenderOrigin(origin)) {
       return callback(null, true);
     }
     return callback(new Error(`Origin not allowed by CORS: ${origin}`));
