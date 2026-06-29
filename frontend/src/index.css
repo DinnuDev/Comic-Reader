@@ -110,8 +110,54 @@ html, body {
 .ant-input { background: rgba(255,255,255,0.07) !important; border-color: rgba(255,255,255,0.15) !important; color: #e5e5e5 !important; }
 .ant-input-number { background: rgba(255,255,255,0.07) !important; }
 .ant-select-selector { background: rgba(255,255,255,0.07) !important; border-color: rgba(255,255,255,0.15) !important; color: #e5e5e5 !important; }
-.ant-btn-default { background: rgba(255,255,255,0.08) !important; border-color: rgba(255,255,255,0.15) !important; color: #e5e5e5 !important; }
-.ant-btn-default:hover { background: rgba(255,255,255,0.14) !important; color: #fff !important; }
+
+.ant-btn {
+  border-radius: 10px !important;
+  transition: transform 0.16s ease, box-shadow 0.2s ease, filter 0.2s ease !important;
+}
+
+.ant-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.ant-btn-default {
+  background: linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06)) !important;
+  border-color: rgba(255,255,255,0.2) !important;
+  color: #ececec !important;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.24);
+}
+
+.ant-btn-default:hover {
+  background: linear-gradient(145deg, rgba(255,255,255,0.18), rgba(255,255,255,0.1)) !important;
+  color: #ffffff !important;
+  box-shadow: 0 11px 20px rgba(0,0,0,0.3);
+}
+
+.ant-btn-primary {
+  background: linear-gradient(135deg, #ff2a3a 0%, #e50914 56%, #b1040f 100%) !important;
+  border-color: rgba(255,76,88,0.72) !important;
+  box-shadow: 0 10px 20px rgba(229, 9, 20, 0.3);
+}
+
+.ant-btn-primary:hover {
+  filter: saturate(1.12);
+  box-shadow: 0 14px 26px rgba(229, 9, 20, 0.36);
+}
+
+.ant-btn-dangerous,
+.ant-btn-default.ant-btn-dangerous {
+  background: linear-gradient(145deg, #562324, #3f191a) !important;
+  border-color: rgba(255,120,120,0.58) !important;
+  color: #ffc0c0 !important;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.26);
+}
+
+.ant-btn-dangerous:hover,
+.ant-btn-default.ant-btn-dangerous:hover {
+  color: #ffd2d2 !important;
+  border-color: rgba(255,150,150,0.7) !important;
+  box-shadow: 0 11px 20px rgba(0,0,0,0.3);
+}
 
 /* ── Scroll-animation utility classes ──────────── */
 .animate-fade-up {

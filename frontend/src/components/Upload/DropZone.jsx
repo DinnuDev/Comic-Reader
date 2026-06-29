@@ -24,6 +24,7 @@ const { Text } = Typography;
 
 const ALLOWED_EXTS = ['.cbz', '.cbr', '.zip', '.pdf'];
 const MAX_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB
+let lastConsumedDialogTriggerKey = 0;
 
 function fmtSize(b) {
   if (b >= 1024 ** 3) return `${(b / 1024 ** 3).toFixed(2)} GB`;
@@ -54,11 +55,10 @@ export default function DropZone({
   const dragCounter = useRef(0);
   const abortRef = useRef(null);
   const startTimeRef = useRef(0);
-  const lastDialogTriggerRef = useRef(0);
 
   useEffect(() => {
-    if (triggerFileDialogKey > 0 && triggerFileDialogKey !== lastDialogTriggerRef.current) {
-      lastDialogTriggerRef.current = triggerFileDialogKey;
+    if (triggerFileDialogKey > 0 && triggerFileDialogKey !== lastConsumedDialogTriggerKey) {
+      lastConsumedDialogTriggerKey = triggerFileDialogKey;
       inputRef.current?.click();
     }
   }, [triggerFileDialogKey]);

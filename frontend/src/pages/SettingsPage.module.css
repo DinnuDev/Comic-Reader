@@ -42,6 +42,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: 44px;
   padding: 11px 16px;
   background: transparent;
   border: none;
@@ -176,6 +177,7 @@
   flex-direction: column;
   align-items: center;
   gap: 3px;
+  min-height: 44px;
   padding: 10px 20px;
   background: rgba(255,255,255,0.04);
   border: 1.5px solid rgba(255,255,255,0.1);
@@ -207,8 +209,8 @@
 }
 
 .swatch {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   border: 2.5px solid;
   cursor: pointer;
@@ -307,6 +309,13 @@
   letter-spacing: 0.3px;
 }
 
+.navItem:focus-visible,
+.dirBtn:focus-visible,
+.swatch:focus-visible {
+  outline: 2px solid rgba(255, 90, 104, 0.85);
+  outline-offset: 2px;
+}
+
 /* ── Responsive ─────────────────────────────────── */
 @media (max-width: 680px) {
   .sidebar { width: 60px; }
@@ -317,4 +326,14 @@
   .content { padding: 24px 16px; }
   .kbdGrid { grid-template-columns: 1fr; }
   .sel { width: 180px; }
+  .dirBtn { min-height: 46px; }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .navItem:active,
+  .dirBtn:active,
+  .swatch:active {
+    transform: scale(0.98);
+    filter: brightness(1.08);
+  }
 }

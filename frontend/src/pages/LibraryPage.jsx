@@ -333,11 +333,12 @@ export default function LibraryPage() {
             </p>
             <div className={styles.emptyActions}>
               <Button type="primary" size="large" icon={<UploadOutlined />}
-                onClick={openUploadDialog}
-                style={{ background: '#e50914', borderColor: '#e50914' }}>
+                className={styles.emptyPrimaryBtn}
+                onClick={openUploadDialog}>
                 Upload Comics
               </Button>
               <Button size="large" icon={<PlusCircleOutlined />}
+                className={styles.emptySecondaryBtn}
                 onClick={() => navigate('/sources')}>
                 Add Source Folder
               </Button>
@@ -375,29 +376,63 @@ export default function LibraryPage() {
       {/* Toolbar */}
       <div className={styles.toolbar}>
         <Tooltip title="Upload comics">
-          <Button className={styles.iconOnlyBtn} icon={<UploadOutlined />} onClick={openUploadDialog} aria-label="Upload comics" />
+          <Button
+            type="primary"
+            shape="circle"
+            size="large"
+            className={`${styles.iconOnlyBtn} ${styles.iconBtnUpload}`}
+            icon={<UploadOutlined />}
+            onClick={openUploadDialog}
+            aria-label="Upload comics"
+          />
         </Tooltip>
         {!bulkMode && (
           <Tooltip title="Bulk offload mode">
-            <Button className={styles.iconOnlyBtn} icon={<DeleteOutlined />} danger onClick={() => setBulkMode(true)} aria-label="Bulk offload mode" />
+            <Button
+              danger
+              shape="circle"
+              size="large"
+              className={`${styles.iconOnlyBtn} ${styles.iconBtnDanger}`}
+              icon={<DeleteOutlined />}
+              onClick={() => setBulkMode(true)}
+              aria-label="Bulk offload mode"
+            />
           </Tooltip>
         )}
         {bulkMode && (
           <Tooltip title={`Select all (${readyComics.length})`}>
-            <Button className={styles.iconOnlyBtn} icon={<CheckSquareOutlined />} onClick={selectAllVisible} disabled={readyComics.length === 0} aria-label="Select all comics" />
+            <Button
+              shape="circle"
+              size="large"
+              className={`${styles.iconOnlyBtn} ${styles.iconBtnSelect}`}
+              icon={<CheckSquareOutlined />}
+              onClick={selectAllVisible}
+              disabled={readyComics.length === 0}
+              aria-label="Select all comics"
+            />
           </Tooltip>
         )}
         {bulkMode && (
           <Tooltip title={`Select duplicates only (${duplicateComicIds.length})`}>
-            <Button className={styles.iconOnlyBtn} icon={<CopyOutlined />} onClick={selectDuplicatesOnly} disabled={duplicateComicIds.length === 0} aria-label="Select duplicate comics" />
+            <Button
+              shape="circle"
+              size="large"
+              className={`${styles.iconOnlyBtn} ${styles.iconBtnSelect}`}
+              icon={<CopyOutlined />}
+              onClick={selectDuplicatesOnly}
+              disabled={duplicateComicIds.length === 0}
+              aria-label="Select duplicate comics"
+            />
           </Tooltip>
         )}
         {bulkMode && (
           <Tooltip title={`Offload selected (${selectedComicIds.length})`}>
             <Button
-              className={styles.iconOnlyBtn}
-              icon={<DeleteOutlined />}
               danger
+              shape="circle"
+              size="large"
+              className={`${styles.iconOnlyBtn} ${styles.iconBtnDanger}`}
+              icon={<DeleteOutlined />}
               disabled={selectedComicIds.length === 0}
               onClick={offloadSelected}
               aria-label="Offload selected comics"
@@ -406,17 +441,38 @@ export default function LibraryPage() {
         )}
         {bulkMode && (
           <Tooltip title="Exit bulk mode">
-            <Button className={styles.iconOnlyBtn} icon={<CloseOutlined />} onClick={exitBulkMode} aria-label="Exit bulk mode" />
+            <Button
+              shape="circle"
+              size="large"
+              className={`${styles.iconOnlyBtn} ${styles.iconBtnNeutral}`}
+              icon={<CloseOutlined />}
+              onClick={exitBulkMode}
+              aria-label="Exit bulk mode"
+            />
           </Tooltip>
         )}
         {(sources || []).length > 0 && (
           <Tooltip title="Scan all sources">
-            <Button className={styles.iconOnlyBtn} icon={<ReloadOutlined spin={!!scanningId} />} loading={!!scanningId}
-              onClick={handleScanAll} aria-label="Scan all sources" />
+            <Button
+              shape="circle"
+              size="large"
+              className={`${styles.iconOnlyBtn} ${styles.iconBtnScan}`}
+              icon={<ReloadOutlined spin={!!scanningId} />}
+              loading={!!scanningId}
+              onClick={handleScanAll}
+              aria-label="Scan all sources"
+            />
           </Tooltip>
         )}
         <Tooltip title="Go to sources">
-          <Button className={styles.iconOnlyBtn} icon={<PlusCircleOutlined />} onClick={() => navigate('/sources')} aria-label="Go to sources" />
+          <Button
+            shape="circle"
+            size="large"
+            className={`${styles.iconOnlyBtn} ${styles.iconBtnNeutral}`}
+            icon={<PlusCircleOutlined />}
+            onClick={() => navigate('/sources')}
+            aria-label="Go to sources"
+          />
         </Tooltip>
       </div>
 

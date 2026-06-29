@@ -67,13 +67,15 @@ function SourceCard({ source, scanning, onScan, onDelete }) {
         <div className={styles.sourceActions}>
           <Tooltip title={isScan ? 'Scanning…' : 'Scan for new comics'}>
             <Button
-              size="small"
+              type="primary"
+              shape="circle"
+              size="middle"
+              className={`${styles.sourceActionBtn} ${styles.sourceScanBtn}`}
               icon={<SyncOutlined spin={isScan} />}
               loading={isScan}
               onClick={() => onScan(source.id, source.name)}
-            >
-              Scan
-            </Button>
+              aria-label={`Scan source ${source.name}`}
+            />
           </Tooltip>
           <Popconfirm
             title={`Remove "${source.name}"?`}
@@ -82,7 +84,14 @@ function SourceCard({ source, scanning, onScan, onDelete }) {
             okType="danger"
             onConfirm={() => onDelete(source.id)}
           >
-            <Button size="small" danger icon={<DeleteOutlined />} />
+            <Button
+              danger
+              shape="circle"
+              size="middle"
+              className={`${styles.sourceActionBtn} ${styles.sourceActionDanger}`}
+              icon={<DeleteOutlined />}
+              aria-label={`Remove source ${source.name}`}
+            />
           </Popconfirm>
         </div>
       </div>
@@ -262,8 +271,8 @@ export default function SourcesPage() {
                   style={{ padding: '24px 0' }}
                 >
                   <Button type="primary" icon={<PlusOutlined />}
-                    onClick={() => setAddModal(true)}
-                    style={{ background: '#e50914', borderColor: '#e50914' }}>
+                    className={styles.localAddBtn}
+                    onClick={() => setAddModal(true)}>
                     Add Folder
                   </Button>
                 </Empty>
@@ -305,7 +314,7 @@ export default function SourcesPage() {
         onOk={() => form.submit()}
         onCancel={() => { setAddModal(false); form.resetFields(); }}
         okText="Add & Scan"
-        okButtonProps={{ style: { background: '#e50914', borderColor: '#e50914' } }}
+        okButtonProps={{ className: styles.modalPrimaryBtn }}
         confirmLoading={addMutation.isPending}
         width={480}
       >
