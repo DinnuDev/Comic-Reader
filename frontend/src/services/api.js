@@ -1,14 +1,18 @@
 import axios from 'axios';
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:3001';
+
 // Default API client (30 s timeout for regular calls)
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   timeout: 30000,
 });
 
 // No-timeout client for large file uploads (can take minutes)
 const uploadClient = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   timeout: 0,  // no timeout
 });
 
