@@ -41,6 +41,17 @@ npm run dev
 
 Open http://localhost:5173
 
+### Default Admin Credentials
+- Email: `ops.curator@comixhq.io`
+- Username: `vault.curator`
+- Password: `R7!mQ2#Lx9@T`
+
+These are seeded automatically on backend startup if the account does not already exist.
+You can override them with backend environment variables:
+- `DEFAULT_ADMIN_EMAIL`
+- `DEFAULT_ADMIN_USERNAME`
+- `DEFAULT_ADMIN_PASSWORD`
+
 ## Google Drive Setup
 1. Go to Google Cloud Console
 2. Create a project, enable Google Drive API

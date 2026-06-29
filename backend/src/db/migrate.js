@@ -1,4 +1,33 @@
 const db = require('./database');
+const crypto = require('crypto');
+
+function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function ensureDefaultAdmin() {
+  const adminEmail = (process.env.DEFAULT_ADMIN_EMAIL || 'ops.curator@comixhq.io').trim().toLowerCase();
+  const adminUsername = (process.env.DEFAULT_ADMIN_USERNAME || 'vault.curator').trim();
+  const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'R7!mQ2#Lx9@T';
+
+  const existing = db
+    .prepare('SELECT id FROM users WHERE lower(email) = lower(?) OR lower(username) = lower(?)')
+    .get(adminEmail, adminUsername);
+
+  if (existing) return;
+
+  db.prepare(
+    'INSERT INTO users (id, email, username, password_hash) VALUES (?, ?, ?, ?)'
+  ).run(
+    crypto.randomUUID(),
+    adminEmail,
+    adminUsername,
+    hashPassword(adminPassword)
+  );
+
+  console.log('[auth] Seeded default admin account:', adminEmail);
+}
 
 function migrate() {
   db.exec(`
@@ -71,6 +100,14 @@ function migrate() {
       created_at  INTEGER DEFAULT (unixepoch()),
       updated_at  INTEGER DEFAULT (unixepoch())
     );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id            TEXT PRIMARY KEY,
+      email         TEXT NOT NULL UNIQUE,
+      username      TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at    INTEGER DEFAULT (unixepoch())
+    );
   `);
 
   // Add content hash support for duplicate prevention (safe on existing DBs)
@@ -85,6 +122,18 @@ function migrate() {
     ON comics(content_hash)
     WHERE content_hash IS NOT NULL;
   `);
+
+  // Best-effort case-insensitive username uniqueness for predictable username login.
+  try {
+    db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_ci
+      ON users(lower(username));
+    `);
+  } catch {
+    // Existing duplicate usernames may prevent index creation.
+  }
+
+  ensureDefaultAdmin();
 
   console.log('Database migrated successfully');
 }

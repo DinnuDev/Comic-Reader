@@ -17,8 +17,11 @@ const gdriveRoutes = require('./routes/gdrive');
 const progressRoutes = require('./routes/progress');
 const uploadRoutes = require('./routes/upload');
 const setupRoutes = require('./routes/setup');
+const authRoutes = require('./routes/auth');
+const requireAuth = require('./middleware/requireAuth');
 
 const app = express();
+app.set('trust proxy', 1);
 const frontendDistDir = path.resolve(__dirname, '../../frontend/dist');
 const frontendIndexPath = path.join(frontendDistDir, 'index.html');
 const hasFrontendBuild = fs.existsSync(frontendIndexPath);
@@ -90,23 +93,28 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   },
 }));
 
 // Serve covers & cached images statically
-app.use('/covers', express.static(path.resolve(__dirname, '../data/covers')));
-app.use('/cache', express.static(path.resolve(__dirname, '../data/cache')));
+app.use('/covers', requireAuth, express.static(path.resolve(__dirname, '../data/covers')));
+app.use('/cache', requireAuth, express.static(path.resolve(__dirname, '../data/cache')));
+
+// Public auth routes
+app.use('/api/auth', authRoutes);
 
 // API Routes
-app.use('/api/library', libraryRoutes);
-app.use('/api/reader', readerRoutes);
-app.use('/api/sources', sourcesRoutes);
-app.use('/api/gdrive', gdriveRoutes);
-app.use('/api/progress', progressRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/setup', setupRoutes);
+app.use('/api/library', requireAuth, libraryRoutes);
+app.use('/api/reader', requireAuth, readerRoutes);
+app.use('/api/sources', requireAuth, sourcesRoutes);
+app.use('/api/gdrive', requireAuth, gdriveRoutes);
+app.use('/api/progress', requireAuth, progressRoutes);
+app.use('/api/upload', requireAuth, uploadRoutes);
+app.use('/api/setup', requireAuth, setupRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));

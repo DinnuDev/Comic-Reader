@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Input } from 'antd';
+import { Tooltip } from 'antd';
 import {
   ReadOutlined, BookOutlined, DatabaseOutlined,
-  SettingOutlined, SearchOutlined, CloseOutlined,
+  SettingOutlined, SearchOutlined, CloseOutlined, LogoutOutlined,
 } from '@ant-design/icons';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { authApi } from '../../services/api';
 import styles from './AppLayout.module.css';
 
 const NAV_LINKS = [
@@ -16,11 +18,27 @@ const NAV_LINKS = [
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchVal, setSearchVal] = useState('');
   const searchRef = useRef(null);
   const contentRef = useRef(null);
+
+  const logoutMutation = useMutation({
+    mutationFn: authApi.logout,
+    onSuccess: async () => {
+      queryClient.setQueryData(['auth-user'], null);
+      queryClient.removeQueries({ queryKey: ['auth-user'] });
+      navigate('/auth', { replace: true });
+    },
+    onError: () => {
+      // Force local logout even if network/logout endpoint fails.
+      queryClient.setQueryData(['auth-user'], null);
+      queryClient.removeQueries({ queryKey: ['auth-user'] });
+      navigate('/auth', { replace: true });
+    },
+  });
 
   // Make nav opaque after scrolling down
   useEffect(() => {
@@ -88,9 +106,21 @@ export default function AppLayout() {
               </button>
             </div>
           ) : (
-            <button className={styles.iconBtn} onClick={openSearch} aria-label="Search">
-              <SearchOutlined />
-            </button>
+            <>
+              <button className={styles.iconBtn} onClick={openSearch} aria-label="Search">
+                <SearchOutlined />
+              </button>
+              <Tooltip title="Logout">
+                <button
+                  className={styles.iconBtn}
+                  onClick={() => logoutMutation.mutate()}
+                  aria-label="Logout"
+                  disabled={logoutMutation.isPending}
+                >
+                  <LogoutOutlined />
+                </button>
+              </Tooltip>
+            </>
           )}
         </div>
       </nav>

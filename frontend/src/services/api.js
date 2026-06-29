@@ -12,18 +12,26 @@ function apiUrl(path) {
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
+  withCredentials: true,
 });
 
 // No-timeout client for large file uploads (can take minutes)
 const uploadClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 0,  // no timeout
+  withCredentials: true,
 });
 
 // Global response error handler
 api.interceptors.response.use(
   res => res,
   err => {
+    if (err?.response?.status === 401) {
+      const isAuthEndpoint = (err?.config?.url || '').includes('/auth/');
+      if (!isAuthEndpoint && typeof window !== 'undefined' && window.location.pathname !== '/auth') {
+        window.location.replace('/auth');
+      }
+    }
     return Promise.reject(err);
   }
 );
@@ -67,6 +75,14 @@ export const progressApi = {
 export const setupApi = {
   saveGoogleClientId: (clientId) => api.post('/setup/google-client', { clientId }).then(r => r.data),
   getStatus: () => api.get('/setup/status').then(r => r.data),
+};
+
+// Auth
+export const authApi = {
+  me: () => api.get('/auth/me').then(r => r.data),
+  signup: (data) => api.post('/auth/signup', data).then(r => r.data),
+  login: (data) => api.post('/auth/login', data).then(r => r.data),
+  logout: () => api.post('/auth/logout').then(r => r.data),
 };
 
 // Google Drive

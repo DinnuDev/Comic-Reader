@@ -1,11 +1,14 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ConfigProvider, theme } from 'antd';
+import { ConfigProvider, Spin, theme } from 'antd';
+import { useQuery } from '@tanstack/react-query';
 import AppLayout from './components/Layout/AppLayout';
 import LibraryPage from './pages/LibraryPage';
 import ReaderPage from './pages/ReaderPage';
 import SourcesPage from './pages/SourcesPage';
 import SettingsPage from './pages/SettingsPage';
+import AuthPage from './pages/AuthPage';
+import { authApi } from './services/api';
 
 const antdTheme = {
   algorithm: theme.darkAlgorithm,
@@ -31,14 +34,31 @@ const antdTheme = {
 };
 
 export default function App() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['auth-user'],
+    queryFn: authApi.me,
+    retry: false,
+  });
+
+  const user = data?.user || null;
+
+  if (isLoading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#0a0a0a' }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
   return (
     <ConfigProvider theme={antdTheme}>
       <BrowserRouter>
         <Routes>
+          <Route path="/auth" element={user ? <Navigate to="/" replace /> : <AuthPage />} />
           {/* Reader is full-screen, no layout */}
-          <Route path="/read/:comicId" element={<ReaderPage />} />
+          <Route path="/read/:comicId" element={user ? <ReaderPage /> : <Navigate to="/auth" replace />} />
           {/* All other pages use the app layout */}
-          <Route element={<AppLayout />}>
+          <Route element={user ? <AppLayout /> : <Navigate to="/auth" replace />}>
             <Route path="/" element={<LibraryPage />} />
             <Route path="/sources" element={<SourcesPage />} />
             <Route path="/settings" element={<SettingsPage />} />
