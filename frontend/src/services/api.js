@@ -2,13 +2,16 @@ import axios from 'axios';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL ||
-  'http://localhost:3001';
+  '/api';
+
+function apiUrl(path) {
+  return `${API_BASE_URL}${path}`;
+}
 
 // Default API client (30 s timeout for regular calls)
 const api = axios.create({
-    baseURL:
-        import.meta.env.VITE_API_URL ||
-        "http://localhost:3001"
+  baseURL: API_BASE_URL,
+  timeout: 30000,
 });
 
 // No-timeout client for large file uploads (can take minutes)
@@ -39,8 +42,8 @@ export const libraryApi = {
 // Reader
 export const readerApi = {
   getPages: (comicId) => api.get(`/reader/${comicId}/pages`).then(r => r.data),
-  getPageUrl: (comicId, pageNum) => `/api/reader/${comicId}/page/${pageNum}`,
-  getCoverUrl: (comicId) => `/api/reader/${comicId}/cover`,
+  getPageUrl: (comicId, pageNum) => apiUrl(`/reader/${comicId}/page/${pageNum}`),
+  getCoverUrl: (comicId) => apiUrl(`/reader/${comicId}/cover`),
 };
 
 // Sources

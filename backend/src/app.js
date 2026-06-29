@@ -19,6 +19,9 @@ const uploadRoutes = require('./routes/upload');
 const setupRoutes = require('./routes/setup');
 
 const app = express();
+const frontendDistDir = path.resolve(__dirname, '../../frontend/dist');
+const frontendIndexPath = path.join(frontendDistDir, 'index.html');
+const hasFrontendBuild = fs.existsSync(frontendIndexPath);
 
 // Ensure data directories exist
 const dataDirs = [
@@ -92,55 +95,30 @@ app.use('/api/setup', setupRoutes);
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 
-// Root endpoint for platform/browser probes
-app.get('/', (req, res) => {
-  res.type('html').send(`
-    <!doctype html>
-    <html lang="en">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Comic Reader API</title>
-        <style>
-          body {
-            margin: 0;
-            min-height: 100vh;
-            display: grid;
-            place-items: center;
-            background: #0a0a0a;
-            color: #e5e5e5;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          }
-          main {
-            max-width: 680px;
-            padding: 32px;
-            text-align: center;
-          }
-          h1 {
-            margin: 0 0 12px;
-            font-size: 32px;
-          }
-          p {
-            margin: 0 0 18px;
-            color: rgba(255, 255, 255, 0.72);
-            line-height: 1.6;
-          }
-          a {
-            color: #ff5a68;
-            text-decoration: none;
-          }
-        </style>
-      </head>
-      <body>
-        <main>
-          <h1>Comic Reader API</h1>
-          <p>This service is running successfully. Use the frontend application to browse your library and the API endpoints for integrations.</p>
-          <p>Health check: <a href="/api/health">/api/health</a></p>
-        </main>
-      </body>
-    </html>
-  `);
-});
+if (hasFrontendBuild) {
+  app.use(express.static(frontendDistDir));
+
+  app.get('*', (req, res, next) => {
+    if (
+      req.path.startsWith('/api') ||
+      req.path.startsWith('/covers') ||
+      req.path.startsWith('/cache')
+    ) {
+      return next();
+    }
+
+    return res.sendFile(frontendIndexPath);
+  });
+} else {
+  // Root endpoint for platform/browser probes when no frontend build is present
+  app.get('/', (req, res) => {
+    res.json({
+      service: 'Comic Reader API',
+      status: 'ok',
+      health: '/api/health',
+    });
+  });
+}
 
 // Favicon probe from browsers
 app.get('/favicon.ico', (req, res) => res.status(204).end());
