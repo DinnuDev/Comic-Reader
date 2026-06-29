@@ -82,6 +82,18 @@ app.use('/api/setup', setupRoutes);
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 
+// Root endpoint for platform/browser probes
+app.get('/', (req, res) => {
+  res.json({
+    service: 'Comic Reader API',
+    status: 'ok',
+    health: '/api/health',
+  });
+});
+
+// Favicon probe from browsers
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 // 404
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
