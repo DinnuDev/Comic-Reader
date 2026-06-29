@@ -4,6 +4,7 @@
   "description": "Comic Reader API Server",
   "main": "server.js",
   "scripts": {
+    "build": "echo \"No build step required for backend\"",
     "start": "node server.js",
     "dev": "nodemon server.js",
     "db:migrate": "node src/db/migrate.js"
