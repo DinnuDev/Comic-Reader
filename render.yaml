@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: comic-reader
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: node server.js
+    disk:
+      name: comic-reader-data
+      mountPath: /mnt/data
+      sizeGB: 10
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DB_PATH
+        value: /mnt/data/comic-reader.db
+      - key: CACHE_DIR
+        value: /mnt/data/cache
+      - key: COVERS_DIR
+        value: /mnt/data/covers
+      - key: UPLOADS_DIR
+        value: /mnt/data/uploads
+      - key: SESSIONS_DIR
+        value: /mnt/data/sessions
+      - key: FRONTEND_URL
+        value: https://comic-reader-fkbe.onrender.com

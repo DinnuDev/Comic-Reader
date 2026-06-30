@@ -27,15 +27,17 @@ const frontendIndexPath = path.join(frontendDistDir, 'index.html');
 const hasFrontendBuild = fs.existsSync(frontendIndexPath);
 
 // Ensure data directories exist
+const resolveDataDir = (envVar, fallback) =>
+  process.env[envVar] ? path.resolve(process.env[envVar]) : path.resolve(__dirname, '..', fallback);
+
 const dataDirs = [
-  process.env.CACHE_DIR || './data/cache',
-  process.env.COVERS_DIR || './data/covers',
-  './data/uploads',
-  './data/sessions',
+  resolveDataDir('CACHE_DIR', './data/cache'),
+  resolveDataDir('COVERS_DIR', './data/covers'),
+  resolveDataDir('UPLOADS_DIR', './data/uploads'),
+  resolveDataDir('SESSIONS_DIR', './data/sessions'),
 ];
 dataDirs.forEach(dir => {
-  const absDir = path.resolve(__dirname, '..', dir);
-  if (!fs.existsSync(absDir)) fs.mkdirSync(absDir, { recursive: true });
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
 // Security
@@ -85,7 +87,7 @@ app.use(express.urlencoded({ extended: false }));
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 
 // Sessions (file-based store, no native deps)
-const sessionsDir = path.resolve(__dirname, '../data/sessions');
+const sessionsDir = resolveDataDir('SESSIONS_DIR', '../data/sessions');
 if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir, { recursive: true });
 app.use(session({
   store: new FileStore({ path: sessionsDir, ttl: 7 * 24 * 3600, retries: 1 }),
